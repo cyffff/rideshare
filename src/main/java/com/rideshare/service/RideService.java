@@ -1,158 +1,138 @@
 package com.rideshare.service;
 
 import com.rideshare.dto.RideRequest;
-import com.rideshare.exception.RideException;
 import com.rideshare.model.Ride;
-import com.rideshare.model.RideStatus;
 import com.rideshare.model.User;
-import com.rideshare.model.UserRole;
-import com.rideshare.repository.RideRepository;
-import com.rideshare.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
-@Service
-@RequiredArgsConstructor
-public class RideService {
-    private final RideRepository rideRepository;
-    private final UserRepository userRepository;
-
-    @Transactional
-    public Ride requestRide(RideRequest request, User passenger) {
-        validateRideRequest(request);
-
-        if (request.getRideTime().isBefore(LocalDateTime.now())) {
-            throw new RideException("Ride time cannot be in the past");
-        }
-
-        Ride ride = new Ride();
-        ride.setPassenger(passenger);
-        ride.setPickupLocation(request.getPickupLocation());
-        ride.setDropoffLocation(request.getDropoffLocation());
-        ride.setRideTime(request.getRideTime());
-        ride.setSeats(request.getSeats());
-        ride.setLuggageSize(request.getLuggageSize());
-        ride.setNotes(request.getNotes());
-        ride.setStatus(RideStatus.PENDING);
-        
-        // Set coordinates if available
-        if (request.getPickupCoordinates() != null) {
-            ride.setPickupLat(request.getPickupCoordinates().getLat());
-            ride.setPickupLng(request.getPickupCoordinates().getLng());
-        }
-        
-        if (request.getDropoffCoordinates() != null) {
-            ride.setDropoffLat(request.getDropoffCoordinates().getLat());
-            ride.setDropoffLng(request.getDropoffCoordinates().getLng());
-        }
-
-        // Calculate estimated price based on distance and other factors
-        BigDecimal price = calculatePrice(
-            request.getPickupLocation(),
-            request.getDropoffLocation(),
-            request.getSeats(),
-            request.getPickupCoordinates(),
-            request.getDropoffCoordinates()
-        );
-        ride.setPrice(price);
-
-        return rideRepository.save(ride);
-    }
-
-    private void validateRideRequest(RideRequest request) {
-        if (request.getSeats() < 1) {
-            throw new RideException("At least one seat is required");
-        }
-    }
-
-    @Transactional
-    public Ride acceptRide(Long rideId, User driver) {
-        if (driver.getRole() != UserRole.DRIVER) {
-            throw new RideException("Only drivers can accept rides");
-        }
-
-        Ride ride = getRide(rideId);
-
-        if (ride.getStatus() != RideStatus.PENDING) {
-            throw new RideException("Ride is not available for acceptance");
-        }
-
-        if (ride.getDriver() != null && !ride.getDriver().equals(driver)) {
-            throw new RideException("Ride already accepted by another driver");
-        }
-
-        ride.setDriver(driver);
-        ride.setStatus(RideStatus.ACCEPTED);
-        return rideRepository.save(ride);
-    }
-
-    public List<Ride> findRidesByUser(User user) {
-        switch (user.getRole()) {
-            case DRIVER:
-                return rideRepository.findByDriver(user);
-            case PASSENGER:
-                return rideRepository.findByPassenger(user);
-            default:
-                throw new RideException("Invalid user role");
-        }
-    }
-
-    public Ride getRide(Long id) {
-        return rideRepository.findById(id)
-            .orElseThrow(() -> new RideException("Ride not found"));
-    }
-
-    private BigDecimal calculatePrice(String pickup, String dropoff, int seats, 
-                                     RideRequest.Coordinates pickupCoords, 
-                                     RideRequest.Coordinates dropoffCoords) {
-        // Base price
-        double basePrice = 5.0;
-        
-        // Price per seat
-        double seatPrice = 2.0 * seats;
-        
-        // Calculate distance-based price if coordinates are available
-        double distancePrice = 0.0;
-        if (pickupCoords != null && dropoffCoords != null) {
-            double distance = calculateDistance(
-                pickupCoords.getLat(), pickupCoords.getLng(),
-                dropoffCoords.getLat(), dropoffCoords.getLng()
-            );
-            
-            // Price per kilometer (or mile)
-            distancePrice = distance * 1.5;
-        } else {
-            // Default distance price if coordinates not available
-            distancePrice = 10.0;
-        }
-        
-        // Total price
-        double totalPrice = basePrice + seatPrice + distancePrice;
-        
-        return BigDecimal.valueOf(totalPrice).setScale(2, BigDecimal.ROUND_HALF_UP);
-    }
+public interface RideService {
     
     /**
-     * Calculate distance between two points using the Haversine formula
-     * @return Distance in kilometers
+     * Request a new ride
+     * @param request The ride request details
+     * @param passenger The passenger requesting the ride
+     * @return The created ride
      */
-    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Radius of the earth in km
-        
-        double latDistance = Math.toRadians(lat2 - lat1);
-        double lonDistance = Math.toRadians(lon2 - lon1);
-        
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-        
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        
-        return R * c; // Distance in km
-    }
+    Ride requestRide(RideRequest request, User passenger);
+    
+    /**
+     * Schedule a ride for a future time
+     * @param request The ride request details
+     * @param passenger The passenger scheduling the ride
+     * @return The scheduled ride
+     */
+    Ride scheduleRide(RideRequest request, User passenger);
+    
+    /**
+     * Cancel a ride
+     * @param rideId The ride ID to cancel
+     * @param userId The user ID of the person cancelling the ride
+     * @return The cancelled ride
+     */
+    Ride cancelRide(Long rideId, Long userId);
+    
+    /**
+     * Accept a ride request (for drivers)
+     * @param rideId The ride ID to accept
+     * @param driver The driver accepting the ride
+     * @return The accepted ride
+     */
+    Ride acceptRide(Long rideId, User driver);
+    
+    /**
+     * Start a ride (for drivers)
+     * @param rideId The ride ID to start
+     * @param driverId The driver ID starting the ride
+     * @return The started ride
+     */
+    Ride startRide(Long rideId, Long driverId);
+    
+    /**
+     * Complete a ride (for drivers)
+     * @param rideId The ride ID to complete
+     * @param driverId The driver ID completing the ride
+     * @return The completed ride
+     */
+    Ride completeRide(Long rideId, Long driverId);
+    
+    /**
+     * Rate a driver after a ride
+     * @param rideId The ride ID
+     * @param passengerId The passenger ID giving the rating
+     * @param rating The rating value
+     * @param review Optional review text
+     * @return The updated ride
+     */
+    Ride rateDriver(Long rideId, Long passengerId, Double rating, String review);
+    
+    /**
+     * Rate a passenger after a ride
+     * @param rideId The ride ID
+     * @param driverId The driver ID giving the rating
+     * @param rating The rating value
+     * @param review Optional review text
+     * @return The updated ride
+     */
+    Ride ratePassenger(Long rideId, Long driverId, Double rating, String review);
+    
+    /**
+     * Get a ride by ID
+     * @param id The ride ID
+     * @return The ride
+     */
+    Ride getRide(Long id);
+    
+    /**
+     * Find rides by user (either as passenger or driver)
+     * @param user The user
+     * @return List of rides for the user
+     */
+    List<Ride> findRidesByUser(User user);
+    
+    /**
+     * Find active rides for a driver
+     * @param driverId The driver ID
+     * @return The active ride, or null if none
+     */
+    Ride findActiveRideForDriver(Long driverId);
+    
+    /**
+     * Find active rides for a passenger
+     * @param passengerId The passenger ID
+     * @return The active ride, or null if none
+     */
+    Ride findActiveRideForPassenger(Long passengerId);
+    
+    /**
+     * Find nearby available rides (for drivers)
+     * @param latitude Driver's latitude
+     * @param longitude Driver's longitude
+     * @param radiusInKm Search radius in kilometers
+     * @return List of available rides nearby
+     */
+    List<Ride> findNearbyAvailableRides(Double latitude, Double longitude, Double radiusInKm);
+    
+    /**
+     * Find available shared rides that match a passenger's route
+     * @param request The passenger's ride request
+     * @return List of available shared rides
+     */
+    List<Ride> findAvailableSharedRides(RideRequest request);
+    
+    /**
+     * Join a shared ride
+     * @param sharedRideId The shared ride ID to join
+     * @param passengerId The passenger ID joining the ride
+     * @return The updated shared ride
+     */
+    Ride joinSharedRide(Long sharedRideId, Long passengerId);
+    
+    /**
+     * Check if a ride is owned by a specific user
+     * @param rideId The ride ID
+     * @param userId The user ID
+     * @return True if the ride is owned by the user, false otherwise
+     */
+    boolean isRideOwnedByUser(Long rideId, Long userId);
 } 

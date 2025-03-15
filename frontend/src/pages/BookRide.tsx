@@ -1,358 +1,426 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
+  Box,
+  Button,
   Container,
   Paper,
-  Typography,
   TextField,
-  Button,
-  Box,
-  Alert,
+  Typography,
   CircularProgress,
   Grid,
-  Divider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  SelectChangeEvent,
-  IconButton,
-  InputAdornment,
+  FormControlLabel,
+  Switch,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
+import { LoadScript, GoogleMap, Marker, DirectionsRenderer } from '@react-google-maps/api';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
-import MyLocationIcon from '@mui/icons-material/MyLocation';
-import SwapVertIcon from '@mui/icons-material/SwapVert';
-import LocationSearch from '../components/LocationSearch';
-import GoogleMap from '../components/GoogleMap';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || '');
+const libraries: ("places" | "drawing" | "geometry" | "localContext" | "visualization")[] = ['places'];
 
-const BookRide = () => {
-  const [rideData, setRideData] = useState({
+const BookRide: React.FC = () => {
+  const navigate = useNavigate();
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
+  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [pickupAutocomplete, setPickupAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [dropoffAutocomplete, setDropoffAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [isCalculating, setIsCalculating] = useState<boolean>(false);
+  const [rideDetails, setRideDetails] = useState({
     pickupLocation: '',
     dropoffLocation: '',
-    rideTime: new Date(),
-    seats: 1,
-    luggageSize: 'SMALL',
-    notes: '',
+    pickupLatitude: 0,
+    pickupLongitude: 0,
+    dropoffLatitude: 0,
+    dropoffLongitude: 0,
+    estimatedDistance: 0,
+    estimatedDuration: 0,
+    isShared: false,
+    isScheduled: false,
+    scheduledTime: new Date(),
+    estimatedPrice: 0
   });
-  
-  const [pickupCoordinates, setPickupCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-  const [dropoffCoordinates, setDropoffCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [price, setPrice] = useState<number | null>(null);
-  const [clientSecret, setClientSecret] = useState('');
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setRideData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const mapContainerStyle = {
+    width: '100%',
+    height: '400px',
   };
 
-  const handleSelectChange = (e: SelectChangeEvent) => {
-    const { name, value } = e.target;
-    setRideData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const defaultCenter = {
+    lat: 40.7128,
+    lng: -74.006,
   };
 
-  const handleDateChange = (newValue: Date | null) => {
-    if (newValue) {
-      setRideData((prev) => ({
-        ...prev,
-        rideTime: newValue,
-      }));
+  // Load current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        () => {
+          setError('Error retrieving your location');
+        }
+      );
     }
+  }, []);
+
+  // Handle map load
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map);
+    setDirectionsService(new google.maps.DirectionsService());
+    setDirectionsRenderer(new google.maps.DirectionsRenderer({ map }));
+    setIsLoaded(true);
+  }, []);
+
+  // Set up autocomplete
+  const onPickupAutocompleteLoad = (autocomplete: google.maps.places.Autocomplete) => {
+    setPickupAutocomplete(autocomplete);
   };
 
-  const handlePickupLocationChange = (value: string, coordinates?: { lat: number; lng: number }) => {
-    setRideData((prev) => ({
-      ...prev,
-      pickupLocation: value,
-    }));
-    
-    if (coordinates) {
-      setPickupCoordinates(coordinates);
-    }
+  const onDropoffAutocompleteLoad = (autocomplete: google.maps.places.Autocomplete) => {
+    setDropoffAutocomplete(autocomplete);
   };
 
-  const handleDropoffLocationChange = (value: string, coordinates?: { lat: number; lng: number }) => {
-    setRideData((prev) => ({
-      ...prev,
-      dropoffLocation: value,
-    }));
-    
-    if (coordinates) {
-      setDropoffCoordinates(coordinates);
-    }
-  };
-
-  const handleGetCurrentLocation = async () => {
-    if ('geolocation' in navigator) {
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject);
+  // Handle place selection
+  const onPickupPlaceChanged = () => {
+    if (pickupAutocomplete) {
+      const place = pickupAutocomplete.getPlace();
+      if (place.geometry && place.geometry.location) {
+        setRideDetails({
+          ...rideDetails,
+          pickupLocation: place.formatted_address || '',
+          pickupLatitude: place.geometry.location.lat(),
+          pickupLongitude: place.geometry.location.lng()
         });
+        calculateRoute();
+      }
+    }
+  };
 
-        const { latitude, longitude } = position.coords;
-        
-        // Set coordinates
-        const coordinates = { lat: latitude, lng: longitude };
-        setPickupCoordinates(coordinates);
-        
-        // Use reverse geocoding to get address
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ location: coordinates }, (results, status) => {
-          if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
-            const address = results[0].formatted_address;
-            setRideData((prev) => ({
-              ...prev,
-              pickupLocation: address,
-            }));
+  const onDropoffPlaceChanged = () => {
+    if (dropoffAutocomplete) {
+      const place = dropoffAutocomplete.getPlace();
+      if (place.geometry && place.geometry.location) {
+        setRideDetails({
+          ...rideDetails,
+          dropoffLocation: place.formatted_address || '',
+          dropoffLatitude: place.geometry.location.lat(),
+          dropoffLongitude: place.geometry.location.lng()
+        });
+        calculateRoute();
+      }
+    }
+  };
+
+  // Calculate route
+  const calculateRoute = useCallback(() => {
+    if (
+      directionsService &&
+      rideDetails.pickupLatitude &&
+      rideDetails.pickupLongitude &&
+      rideDetails.dropoffLatitude &&
+      rideDetails.dropoffLongitude
+    ) {
+      setIsCalculating(true);
+      
+      const origin = { lat: rideDetails.pickupLatitude, lng: rideDetails.pickupLongitude };
+      const destination = { lat: rideDetails.dropoffLatitude, lng: rideDetails.dropoffLongitude };
+      
+      directionsService.route(
+        {
+          origin,
+          destination,
+          travelMode: google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            setDirections(result);
+            
+            if (directionsRenderer) {
+              directionsRenderer.setDirections(result);
+            }
+            
+            const route = result.routes[0];
+            const leg = route.legs[0];
+            const distance = leg.distance?.value || 0; // in meters
+            const duration = leg.duration?.value || 0; // in seconds
+            
+            // Convert to appropriate units
+            const distanceInKm = distance / 1000;
+            const durationInMinutes = Math.ceil(duration / 60);
+            
+            // Calculate price (base fare + distance fare + time fare)
+            const baseFare = 5;
+            const distanceFare = distanceInKm * 2; // $2 per km
+            const timeFare = durationInMinutes * 0.5; // $0.5 per minute
+            const totalPrice = baseFare + distanceFare + timeFare;
+            
+            setRideDetails({
+              ...rideDetails,
+              estimatedDistance: distanceInKm,
+              estimatedDuration: durationInMinutes,
+              estimatedPrice: totalPrice
+            });
           } else {
-            // Fallback to coordinates if geocoding fails
-            setRideData((prev) => ({
-              ...prev,
-              pickupLocation: `${latitude}, ${longitude}`,
-            }));
+            setError('Could not calculate route');
           }
-        });
-      } catch (err) {
-        setError('Failed to get current location');
-      }
+          
+          setIsCalculating(false);
+        }
+      );
     }
-  };
+  }, [directionsService, directionsRenderer, rideDetails]);
 
-  const handleSwapLocations = () => {
-    setRideData((prev) => ({
-      ...prev,
-      pickupLocation: prev.dropoffLocation,
-      dropoffLocation: prev.pickupLocation,
-    }));
-    
-    // Swap coordinates too
-    const tempCoords = pickupCoordinates;
-    setPickupCoordinates(dropoffCoordinates);
-    setDropoffCoordinates(tempCoords);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
+  // Handle booking submission
+  const handleBookRide = async () => {
     try {
-      // First, get a price estimate
-      const estimateResponse = await fetch('/api/rides/estimate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          ...rideData,
-          pickupCoordinates,
-          dropoffCoordinates
-        }),
-      });
-
-      if (!estimateResponse.ok) {
-        throw new Error('Failed to get price estimate');
-      }
-
-      const estimateData = await estimateResponse.json();
-      setPrice(estimateData.price);
-
-      // Create a payment intent
-      const paymentResponse = await fetch('/api/rides/payment-intent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          ...rideData,
-          pickupCoordinates,
-          dropoffCoordinates,
-          amount: estimateData.price,
-        }),
-      });
-
-      if (!paymentResponse.ok) {
-        throw new Error('Failed to create payment intent');
-      }
-
-      const { clientSecret } = await paymentResponse.json();
-      setClientSecret(clientSecret);
-    } catch (err) {
-      setError('Failed to book ride. Please try again.');
-    } finally {
+      setLoading(true);
+      
+      const rideRequest = {
+        pickupLocation: rideDetails.pickupLocation,
+        dropoffLocation: rideDetails.dropoffLocation,
+        pickupLatitude: rideDetails.pickupLatitude,
+        pickupLongitude: rideDetails.pickupLongitude,
+        dropoffLatitude: rideDetails.dropoffLatitude,
+        dropoffLongitude: rideDetails.dropoffLongitude,
+        estimatedDistance: rideDetails.estimatedDistance,
+        estimatedDuration: rideDetails.estimatedDuration,
+        isShared: rideDetails.isShared,
+        isScheduled: rideDetails.isScheduled,
+        scheduledTime: rideDetails.isScheduled ? rideDetails.scheduledTime.toISOString() : null
+      };
+      
+      // Call the appropriate endpoint based on whether it's a scheduled ride
+      const endpoint = rideDetails.isScheduled ? '/api/rides/schedule' : '/api/rides';
+      const response = await axios.post(endpoint, rideRequest);
+      
       setLoading(false);
+      setShowConfirmation(true);
+    } catch (error) {
+      setLoading(false);
+      if (axios.isAxiosError(error) && error.response) {
+        setError(error.response.data.error || 'Failed to book ride');
+      } else {
+        setError('An unexpected error occurred');
+      }
     }
+  };
+
+  const handleConfirmationClose = () => {
+    setShowConfirmation(false);
+    navigate('/ride-history');
   };
 
   return (
     <Container maxWidth="md">
-      <Box sx={{ mt: 8, mb: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h4" component="h1" align="center" gutterBottom>
-            Book a Ride
-          </Typography>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <form onSubmit={handleSubmit}>
+      <Paper elevation={3} sx={{ p: 4, my: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Book a Ride
+        </Typography>
+        
+        <LoadScript
+          googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''}
+          libraries={libraries}
+        >
+          <Box my={3}>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <LocationSearch
-                      label="Pickup Location"
-                      value={rideData.pickupLocation}
-                      onChange={handlePickupLocationChange}
-                      required
-                    />
-                    <IconButton onClick={handleGetCurrentLocation} sx={{ ml: 1 }}>
-                      <MyLocationIcon />
-                    </IconButton>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                    <IconButton onClick={handleSwapLocations}>
-                      <SwapVertIcon />
-                    </IconButton>
-                  </Box>
-                  
-                  <LocationSearch
-                    label="Dropoff Location"
-                    value={rideData.dropoffLocation}
-                    onChange={handleDropoffLocationChange}
-                    required
-                  />
-                  
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <DateTimePicker
-                      label="Ride Time"
-                      value={rideData.rideTime}
-                      onChange={handleDateChange}
-                      sx={{ width: '100%' }}
-                    />
-                  </LocalizationProvider>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <FormControl fullWidth>
-                        <InputLabel>Seats</InputLabel>
-                        <Select
-                          name="seats"
-                          value={rideData.seats.toString()}
-                          label="Seats"
-                          onChange={handleSelectChange}
-                        >
-                          {[1, 2, 3, 4].map((num) => (
-                            <MenuItem key={num} value={num}>
-                              {num} {num === 1 ? 'seat' : 'seats'}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <FormControl fullWidth>
-                        <InputLabel>Luggage Size</InputLabel>
-                        <Select
-                          name="luggageSize"
-                          value={rideData.luggageSize}
-                          label="Luggage Size"
-                          onChange={handleSelectChange}
-                        >
-                          <MenuItem value="NONE">None</MenuItem>
-                          <MenuItem value="SMALL">Small</MenuItem>
-                          <MenuItem value="MEDIUM">Medium</MenuItem>
-                          <MenuItem value="LARGE">Large</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  </Grid>
-                  
+              <Grid item xs={12}>
+                <Typography variant="subtitle1">Pickup Location</Typography>
+                {isLoaded && (
                   <TextField
                     fullWidth
-                    label="Additional Notes"
-                    name="notes"
-                    value={rideData.notes}
-                    onChange={handleChange}
-                    multiline
-                    rows={3}
-                    placeholder="Any special requirements or information for the driver"
+                    id="pickup-location"
+                    placeholder="Enter pickup location"
+                    value={rideDetails.pickupLocation}
+                    onChange={(e) => setRideDetails({ ...rideDetails, pickupLocation: e.target.value })}
+                    inputProps={{
+                      onFocus: (e) => {
+                        const input = e.target as HTMLInputElement;
+                        if (!pickupAutocomplete) {
+                          const autocomplete = new google.maps.places.Autocomplete(input, {
+                            fields: ['formatted_address', 'geometry'],
+                          });
+                          autocomplete.addListener('place_changed', onPickupPlaceChanged);
+                          setPickupAutocomplete(autocomplete);
+                        }
+                      },
+                    }}
                   />
-                </Box>
+                )}
               </Grid>
               
-              <Grid item xs={12} md={6}>
-                <Box sx={{ height: '100%', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-                  <Typography variant="h6" gutterBottom>
-                    Route Preview
-                  </Typography>
-                  <Box sx={{ flexGrow: 1, borderRadius: '8px', overflow: 'hidden' }}>
-                    <GoogleMap
-                      pickupLocation={pickupCoordinates || undefined}
-                      dropoffLocation={dropoffCoordinates || undefined}
-                      showDirections={!!(pickupCoordinates && dropoffCoordinates)}
-                      height="100%"
-                    />
-                  </Box>
-                </Box>
+              <Grid item xs={12}>
+                <Typography variant="subtitle1">Dropoff Location</Typography>
+                {isLoaded && (
+                  <TextField
+                    fullWidth
+                    id="dropoff-location"
+                    placeholder="Enter dropoff location"
+                    value={rideDetails.dropoffLocation}
+                    onChange={(e) => setRideDetails({ ...rideDetails, dropoffLocation: e.target.value })}
+                    inputProps={{
+                      onFocus: (e) => {
+                        const input = e.target as HTMLInputElement;
+                        if (!dropoffAutocomplete) {
+                          const autocomplete = new google.maps.places.Autocomplete(input, {
+                            fields: ['formatted_address', 'geometry'],
+                          });
+                          autocomplete.addListener('place_changed', onDropoffPlaceChanged);
+                          setDropoffAutocomplete(autocomplete);
+                        }
+                      },
+                    }}
+                  />
+                )}
               </Grid>
             </Grid>
-
-            {price && (
-              <Box sx={{ mt: 3, mb: 2, textAlign: 'center' }}>
-                <Typography variant="h5" gutterBottom>
-                  Estimated Price: ${price.toFixed(2)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Final price may vary based on actual distance and time
-                </Typography>
-              </Box>
-            )}
-
+          </Box>
+          
+          <Box my={3}>
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              center={currentLocation || defaultCenter}
+              zoom={13}
+              onLoad={onLoad}
+            >
+              {currentLocation && (
+                <Marker position={currentLocation} label="You are here" />
+              )}
+              {directions && <DirectionsRenderer directions={directions} />}
+            </GoogleMap>
+          </Box>
+          
+          <Box my={3}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={rideDetails.isShared}
+                      onChange={(e) => setRideDetails({ ...rideDetails, isShared: e.target.checked })}
+                    />
+                  }
+                  label="Shared Ride (Lower Price)"
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={rideDetails.isScheduled}
+                      onChange={(e) => setRideDetails({ ...rideDetails, isScheduled: e.target.checked })}
+                    />
+                  }
+                  label="Schedule for Later"
+                />
+              </Grid>
+              
+              {rideDetails.isScheduled && (
+                <Grid item xs={12}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DateTimePicker
+                      label="Pickup Time"
+                      value={rideDetails.scheduledTime}
+                      onChange={(newValue) => {
+                        if (newValue) {
+                          setRideDetails({ ...rideDetails, scheduledTime: newValue });
+                        }
+                      }}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+              )}
+            </Grid>
+          </Box>
+          
+          {rideDetails.estimatedDistance > 0 && (
+            <Box my={3} p={2} sx={{ backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="h6" gutterBottom>
+                Ride Details
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <Typography variant="body2" color="textSecondary">
+                    Distance
+                  </Typography>
+                  <Typography variant="body1">
+                    {rideDetails.estimatedDistance.toFixed(1)} km
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Typography variant="body2" color="textSecondary">
+                    Duration
+                  </Typography>
+                  <Typography variant="body1">
+                    {rideDetails.estimatedDuration} min
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Typography variant="body2" color="textSecondary">
+                    Price
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    ${rideDetails.estimatedPrice.toFixed(2)}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+          
+          <Box display="flex" justifyContent="center" mt={4}>
             <Button
-              type="submit"
-              fullWidth
               variant="contained"
               color="primary"
               size="large"
-              sx={{ mt: 3 }}
-              disabled={loading || !pickupCoordinates || !dropoffCoordinates}
+              onClick={handleBookRide}
+              disabled={!rideDetails.pickupLocation || !rideDetails.dropoffLocation || loading}
             >
-              {loading ? <CircularProgress size={24} /> : 'Get Estimate & Book'}
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Book Ride'}
             </Button>
-          </form>
-
-          {clientSecret && (
-            <Box sx={{ mt: 4 }}>
-              <Divider sx={{ mb: 3 }} />
-              <Typography variant="h6" gutterBottom>
-                Payment Details
-              </Typography>
-              <Elements stripe={stripePromise} options={{ clientSecret }}>
-                {/* Add your payment form component here */}
-              </Elements>
-            </Box>
-          )}
-        </Paper>
-      </Box>
+          </Box>
+        </LoadScript>
+        
+        <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
+          <Alert onClose={() => setError(null)} severity="error">
+            {error}
+          </Alert>
+        </Snackbar>
+        
+        <Dialog open={showConfirmation} onClose={handleConfirmationClose}>
+          <DialogTitle>Ride Booked Successfully!</DialogTitle>
+          <DialogContent>
+            <Typography>
+              {rideDetails.isScheduled 
+                ? `Your ride has been scheduled for ${rideDetails.scheduledTime.toLocaleString()}.`
+                : 'Your ride request has been sent. A driver will accept it shortly.'}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleConfirmationClose} color="primary">
+              View Ride History
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Paper>
     </Container>
   );
 };

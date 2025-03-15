@@ -8,13 +8,18 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 
+public interface StripeService {
+    String createPaymentIntent(Double amount, String customerId);
+    String getPublishableKey();
+}
+
 @Service
-public class StripeService {
+public class StripeServiceImpl implements StripeService {
 
     @Value("${stripe.api.key}")
     private String stripeApiKey;
 
-    public String createPaymentIntent(BigDecimal amount, String customerId) {
+    public String createPaymentIntent(Double amount, String customerId) {
         try {
             Stripe.apiKey = stripeApiKey;
 
@@ -34,5 +39,11 @@ public class StripeService {
         } catch (Exception e) {
             throw new RuntimeException("Error creating payment intent: " + e.getMessage());
         }
+    }
+
+    @Override
+    public String getPublishableKey() {
+        // Implementation needed
+        throw new UnsupportedOperationException("Method not implemented");
     }
 } 

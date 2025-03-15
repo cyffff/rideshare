@@ -1,115 +1,123 @@
-# Ride Sharing Application
+# RideShare Application
 
-A full-stack ride-sharing application built with Spring Boot and React, featuring Google Maps integration and Stripe payment processing.
+A modern ride-sharing platform built with Spring Boot and React.
 
-## Prerequisites
+## Features
 
+- **User Authentication**: Secure login and registration for passengers and drivers
+- **Ride Booking**: Request, schedule, and track rides in real-time
+- **Driver Dashboard**: Accept rides, navigate to pickup locations, and manage earnings
+- **Ride History**: View past rides, ratings, and receipts
+- **Payment Processing**: Secure payment handling with Stripe integration
+- **Shared Rides**: Option to share rides with other passengers for reduced costs
+- **Rating System**: Rate drivers and passengers after completed rides
+
+## Technology Stack
+
+### Backend
 - Java 17
+- Spring Boot 3.x
+- Spring Security with JWT
+- Spring Data JPA
+- PostgreSQL
+- Stripe API for payments
+- WebSockets for real-time updates
+
+### Frontend
+- React 18
+- TypeScript
+- Material-UI
+- Google Maps API
+- Stripe Elements for payment UI
+- Axios for API communication
+
+## Getting Started
+
+### Prerequisites
+- Java 17+
 - Node.js 16+
-- MySQL 8.0+
-- Google Maps API Key
-- Stripe Account
-
-## Setup
-
-### Database Setup
-
-1. Install MySQL 8.0 or later
-2. Create a MySQL user or use root (for development only)
-3. The application will automatically create the database `rideshare` when it starts
+- PostgreSQL
+- Stripe account (for payment processing)
+- Google Maps API key
 
 ### Backend Setup
 
-1. Update `src/main/resources/application.yml` with your MySQL credentials:
-   ```yaml
-   spring:
-     datasource:
-       url: jdbc:mysql://localhost:3306/rideshare?createDatabaseIfNotExist=true&useSSL=false
-       username: your_username
-       password: your_password
+1. Clone the repository
    ```
-2. Add your Stripe API keys to the application.yml file
-3. Run the Spring Boot application:
-   ```bash
+   git clone https://github.com/yourusername/rideshare.git
+   cd rideshare
+   ```
+
+2. Configure database in `application.properties`
+   ```
+   spring.datasource.url=jdbc:postgresql://localhost:5432/rideshare
+   spring.datasource.username=postgres
+   spring.datasource.password=yourpassword
+   ```
+
+3. Add your Stripe API keys to `application.properties`
+   ```
+   stripe.api.key=your_stripe_secret_key
+   stripe.publishable.key=your_stripe_publishable_key
+   ```
+
+4. Build and run the application
+   ```
    ./mvnw spring-boot:run
    ```
 
 ### Frontend Setup
 
-1. Navigate to the frontend directory:
-   ```bash
+1. Navigate to the frontend directory
+   ```
    cd frontend
    ```
-2. Install dependencies:
-   ```bash
+
+2. Install dependencies
+   ```
    npm install
    ```
-3. Create a `.env` file and add your API keys:
+
+3. Create a `.env` file with your Google Maps API key
    ```
-   REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
-   REACT_APP_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key_here
+   REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
    ```
-4. Start the development server:
-   ```bash
+
+4. Start the development server
+   ```
    npm start
    ```
 
-## Features
+5. Access the application at `http://localhost:3000`
 
-- User authentication (Driver/Passenger)
-- Ride booking system with Google Maps integration
-- Interactive maps for pickup and dropoff locations
-- Real-time route visualization
-- Distance-based pricing
-- Secure payment processing with Stripe
-- Rating system
+## API Documentation
 
-## Google Maps Integration
+The API documentation is available at `/swagger-ui.html` when the backend is running.
 
-The application uses Google Maps for the following features:
+## Database Schema
 
-- Address autocomplete for pickup and dropoff locations
-- Interactive map for selecting locations
-- Route visualization between pickup and dropoff points
-- Distance calculation for accurate pricing
-- Current location detection
-
-To use these features, you need to:
-
-1. Get a Google Maps API key from the [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable the following APIs:
-   - Maps JavaScript API
-   - Places API
-   - Directions API
-   - Geocoding API
-3. Add the API key to your frontend `.env` file
-
-## API Endpoints
-
-### Authentication
-- POST `/api/auth/register` - Register new user
-- POST `/api/auth/login` - User login
-
-### Rides
-- POST `/api/rides` - Create new ride request
-- GET `/api/rides` - Get user's rides
-- GET `/api/rides/{id}` - Get ride details
-- POST `/api/rides/{id}/accept` - Accept a ride (driver only)
-- POST `/api/rides/{id}/payment` - Process ride payment
-
-## Security
-
-- JWT-based authentication
-- Password encryption
-- Secure payment processing
-- Input validation
+The application uses the following main entities:
+- User (with roles: PASSENGER, DRIVER, ADMIN)
+- Ride
+- Payment
+- Rating
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request 
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-mvn -N io.takari:maven:wrapper 
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- [Spring Boot](https://spring.io/projects/spring-boot)
+- [React](https://reactjs.org/)
+- [Material-UI](https://mui.com/)
+- [Google Maps API](https://developers.google.com/maps)
+- [Stripe](https://stripe.com/) 

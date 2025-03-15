@@ -1,9 +1,12 @@
 package com.rideshare.model;
 
 public enum RideStatus {
-    PENDING,
+    REQUESTED,
     ACCEPTED,
+    DRIVER_ARRIVING,
+    DRIVER_ARRIVED,
     IN_PROGRESS,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    SCHEDULED
 } 

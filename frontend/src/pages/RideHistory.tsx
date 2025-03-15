@@ -22,9 +22,16 @@ import {
   Card,
   CardContent,
   CardActions,
+  Tabs,
+  Tab,
+  Rating,
+  TextField
 } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import GoogleMap from '../components/GoogleMap';
+import { format } from 'date-fns';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 interface Ride {
   id: number;
@@ -44,14 +51,27 @@ interface Ride {
     lat: number;
     lng: number;
   };
+  driverRating?: number;
+  passengerRating?: number;
+  passenger?: {
+    id: number;
+    name: string;
+    rating: number;
+  };
 }
 
 const RideHistory = () => {
+  const navigate = useNavigate();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRide, setSelectedRide] = useState<Ride | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [activeTab, setActiveTab] = useState<number>(0);
+  const [ratingDialogOpen, setRatingDialogOpen] = useState<boolean>(false);
+  const [rating, setRating] = useState<number | null>(0);
+  const [review, setReview] = useState<string>('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchRides = async () => {
@@ -121,6 +141,103 @@ const RideHistory = () => {
     setViewMode(viewMode === 'table' ? 'cards' : 'table');
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
+  const getStatusChipColor = (status: string) => {
+    switch (status) {
+      case 'REQUESTED': return 'default';
+      case 'ACCEPTED': return 'primary';
+      case 'DRIVER_ARRIVING': return 'info';
+      case 'DRIVER_ARRIVED': return 'info';
+      case 'IN_PROGRESS': return 'warning';
+      case 'COMPLETED': return 'success';
+      case 'CANCELLED': return 'error';
+      case 'SCHEDULED': return 'secondary';
+      default: return 'default';
+    }
+  };
+
+  const openRatingDialog = (ride: Ride) => {
+    setSelectedRide(ride);
+    setRating(null);
+    setReview('');
+    setRatingDialogOpen(true);
+  };
+
+  const submitRating = async () => {
+    if (!selectedRide || rating === null) return;
+
+    try {
+      setIsSubmittingRating(true);
+      
+      // Decide which endpoint to call based on the user's role
+      const isDriver = Boolean(selectedRide.passenger); // If passenger exists, user is a driver
+      const endpoint = isDriver 
+        ? `/api/rides/${selectedRide.id}/rate-passenger` 
+        : `/api/rides/${selectedRide.id}/rate-driver`;
+      
+      await axios.post(endpoint, null, {
+        params: {
+          rating,
+          review
+        }
+      });
+      
+      // Update the ride in the local state
+      const updatedRides = rides.map(ride => {
+        if (ride.id === selectedRide.id) {
+          if (isDriver) {
+            return { ...ride, passengerRating: rating };
+          } else {
+            return { ...ride, driverRating: rating };
+          }
+        }
+        return ride;
+      });
+      
+      setRides(updatedRides);
+      setRatingDialogOpen(false);
+      setError('');
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      setError('Failed to submit rating');
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  const cancelRide = async (rideId: number) => {
+    try {
+      await axios.post(`/api/rides/${rideId}/cancel`);
+      
+      // Update the ride in the local state
+      const updatedRides = rides.map(ride => {
+        if (ride.id === rideId) {
+          return { ...ride, status: 'CANCELLED' };
+        }
+        return ride;
+      });
+      
+      setRides(updatedRides);
+      setError('');
+    } catch (error) {
+      console.error('Error cancelling ride:', error);
+      setError('Failed to cancel ride');
+    }
+  };
+
+  const filteredRides = () => {
+    if (activeTab === 0) return rides;
+    if (activeTab === 1) return rides.filter(ride => 
+      ['REQUESTED', 'ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(ride.status)
+    );
+    if (activeTab === 2) return rides.filter(ride => ride.status === 'COMPLETED');
+    if (activeTab === 3) return rides.filter(ride => ride.status === 'SCHEDULED');
+    return rides;
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -150,6 +267,15 @@ const RideHistory = () => {
           </Alert>
         )}
         
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={activeTab} onChange={handleTabChange}>
+            <Tab label="All Rides" />
+            <Tab label="Active" />
+            <Tab label="Completed" />
+            <Tab label="Scheduled" />
+          </Tabs>
+        </Box>
+        
         {viewMode === 'table' ? (
           <TableContainer component={Paper}>
             <Table>
@@ -165,7 +291,7 @@ const RideHistory = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rides.map((ride) => (
+                {filteredRides().map((ride) => (
                   <TableRow key={ride.id}>
                     <TableCell>
                       {new Date(ride.rideTime).toLocaleDateString()}
@@ -177,7 +303,7 @@ const RideHistory = () => {
                     <TableCell>
                       <Chip
                         label={ride.status}
-                        color={getStatusColor(ride.status) as any}
+                        color={getStatusChipColor(ride.status) as any}
                         size="small"
                       />
                     </TableCell>
@@ -197,7 +323,7 @@ const RideHistory = () => {
           </TableContainer>
         ) : (
           <Grid container spacing={3}>
-            {rides.map((ride) => (
+            {filteredRides().map((ride) => (
               <Grid item xs={12} sm={6} md={4} key={ride.id}>
                 <Card>
                   <Box sx={{ height: '200px', position: 'relative' }}>
@@ -228,7 +354,7 @@ const RideHistory = () => {
                       </Typography>
                       <Chip
                         label={ride.status}
-                        color={getStatusColor(ride.status) as any}
+                        color={getStatusChipColor(ride.status) as any}
                         size="small"
                       />
                     </Box>
@@ -294,7 +420,7 @@ const RideHistory = () => {
                     <Typography variant="subtitle1">Status:</Typography>
                     <Chip
                       label={selectedRide.status}
-                      color={getStatusColor(selectedRide.status) as any}
+                      color={getStatusChipColor(selectedRide.status) as any}
                     />
                   </Grid>
                 </Grid>
@@ -304,6 +430,40 @@ const RideHistory = () => {
               </DialogActions>
             </>
           )}
+        </Dialog>
+        
+        <Dialog open={ratingDialogOpen} onClose={() => setRatingDialogOpen(false)}>
+          <DialogTitle>Rate Your Driver</DialogTitle>
+          <DialogContent>
+            <Box p={2} display="flex" flexDirection="column" alignItems="center" gap={2}>
+              <Rating
+                value={rating}
+                onChange={(event, newValue) => {
+                  setRating(newValue);
+                }}
+                size="large"
+              />
+              <TextField
+                label="Review (Optional)"
+                multiline
+                rows={4}
+                value={review}
+                onChange={(e) => setReview(e.target.value)}
+                fullWidth
+                variant="outlined"
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRatingDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={submitRating} 
+              color="primary" 
+              disabled={rating === null || isSubmittingRating}
+            >
+              {isSubmittingRating ? <CircularProgress size={24} /> : 'Submit'}
+            </Button>
+          </DialogActions>
         </Dialog>
       </Box>
     </Container>

@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Data
+@Table(name = "rides")
 public class Ride {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,24 +21,52 @@ public class Ride {
     @JoinColumn(name = "driver_id")
     private User driver;
 
+    @Column(nullable = false)
     private String pickupLocation;
+
+    @Column(nullable = false)
     private String dropoffLocation;
-    private LocalDateTime rideTime;
-    private Integer seats;
-    private BigDecimal price;
-    private String notes;
+
+    private Double pickupLatitude;
+    private Double pickupLongitude;
+    private Double dropoffLatitude;
+    private Double dropoffLongitude;
 
     @Enumerated(EnumType.STRING)
-    private RideStatus status;
+    @Column(nullable = false)
+    private RideStatus status = RideStatus.REQUESTED;
 
-    @Enumerated(EnumType.STRING)
-    private LuggageSize luggageSize;
-    
-    // Pickup coordinates
-    private Double pickupLat;
-    private Double pickupLng;
-    
-    // Dropoff coordinates
-    private Double dropoffLat;
-    private Double dropoffLng;
+    private Double price;
+    private Double distance;
+    private Integer duration; // in minutes
+    private LocalDateTime requestTime;
+    private LocalDateTime pickupTime;
+    private LocalDateTime dropoffTime;
+    private Boolean isShared = false;
+    private String paymentIntentId;
+    private Boolean isPaid = false;
+    private String cancellationReason;
+    private Double driverRating;
+    private Double passengerRating;
+    @Column(columnDefinition = "TEXT")
+    private String driverReview;
+    @Column(columnDefinition = "TEXT")
+    private String passengerReview;
+    // For scheduled rides
+    private LocalDateTime scheduledTime;
+    private Boolean isScheduled = false;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        requestTime = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 } 
