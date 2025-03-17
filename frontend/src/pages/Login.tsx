@@ -14,9 +14,12 @@ import {
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { LockOutlined } from '@mui/icons-material';
+import { authAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,22 +31,22 @@ const Login: React.FC = () => {
     setLoading(true);
     setError('');
 
-    // In a real app, this would be API call
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call the actual login API
+      const response = await authAPI.login({ email, password });
       
-      // Demo login - in real app would validate credentials with backend
-      if (email === 'demo@example.com' && password === 'password') {
-        navigate('/');
-      } else {
-        setError('Invalid email or password');
-        setShowError(true);
-      }
-    } catch (err) {
-      setError('Login failed. Please try again.');
+      // Use the AuthContext login function
+      login(
+        response.data.token,
+        response.data.userType,
+        response.data.userId
+      );
+      
+      // No need to navigate here - the AuthContext will handle that
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Invalid email or password';
+      setError(errorMessage);
       setShowError(true);
-    } finally {
       setLoading(false);
     }
   };

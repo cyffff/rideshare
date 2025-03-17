@@ -23,7 +23,14 @@ import {
   IconButton,
   useTheme,
   Tab,
-  Tabs
+  Tabs,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Badge,
+  TextField,
+  Radio
 } from '@mui/material';
 import { 
   DirectionsCar as CarIcon, 
@@ -40,6 +47,8 @@ import {
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import GoogleMap from '../components/GoogleMap';
+import FreeMap from '../components/FreeMap';
+import locationService from '../services/LocationService';
 
 // Define RideRequest interface
 interface RideRequest {
@@ -98,6 +107,10 @@ const DriverDashboard: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<number>(0);
+  const [mapProvider, setMapProvider] = useState<'google' | 'free'>('free');
+  const [pendingRequests, setPendingRequests] = useState<RideRequest[]>([]);
+  const [activeRideRoute, setActiveRideRoute] = useState<{lat: number; lng: number}[]>([]);
+  const [selectedRideRoute, setSelectedRideRoute] = useState<{lat: number; lng: number}[]>([]);
 
   useEffect(() => {
     fetchDriverData();
@@ -119,6 +132,18 @@ const DriverDashboard: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [isOnline]);
+
+  useEffect(() => {
+    if (activeRide) {
+      loadRouteData(activeRide, setActiveRideRoute);
+    }
+  }, [activeRide]);
+  
+  useEffect(() => {
+    if (selectedRide && dialogOpen) {
+      loadRouteData(selectedRide, setSelectedRideRoute);
+    }
+  }, [selectedRide, dialogOpen]);
 
   const fetchDriverData = async () => {
     try {
@@ -380,6 +405,22 @@ const DriverDashboard: React.FC = () => {
     setActiveTab(newValue);
   };
 
+  const loadRouteData = async (ride: RideRequest, setRoute: React.Dispatch<React.SetStateAction<{lat: number; lng: number}[]>>) => {
+    try {
+      // Get directions from the location service
+      const directions = await locationService.getDirections(
+        ride.pickupCoordinates,
+        ride.dropoffCoordinates
+      );
+      
+      // Set the route path
+      setRoute(directions.waypoints);
+    } catch (error) {
+      console.error("Error loading route data:", error);
+      setRoute([]);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
@@ -389,7 +430,45 @@ const DriverDashboard: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+        Driver Dashboard
+      </Typography>
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 2 }}>
+          <Tab label="Active Rides" />
+          <Tab label="Ride Requests" 
+            icon={pendingRequests.length > 0 ? <Badge color="error" badgeContent={pendingRequests.length}><span/></Badge> : undefined} 
+            iconPosition="end" 
+          />
+          <Tab label="Completed Rides" />
+        </Tabs>
+        
+        <Box>
+          <FormControlLabel
+            control={
+              <Radio
+                checked={mapProvider === 'free'}
+                onChange={() => setMapProvider('free')}
+                size="small"
+              />
+            }
+            label="Free Map"
+          />
+          <FormControlLabel
+            control={
+              <Radio
+                checked={mapProvider === 'google'}
+                onChange={() => setMapProvider('google')}
+                size="small"
+              />
+            }
+            label="Google Map"
+          />
+        </Box>
+      </Box>
+      
       <Paper elevation={3} sx={{ p: 4, my: 4, borderRadius: 2 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
           <Box display="flex" alignItems="center">
@@ -576,12 +655,22 @@ const DriverDashboard: React.FC = () => {
               boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
             }}>
               <Box sx={{ height: '200px', position: 'relative' }}>
-                <GoogleMap
-                  pickupLocation={activeRide.pickupCoordinates}
-                  dropoffLocation={activeRide.dropoffCoordinates}
-                  showDirections={true}
-                  height="200px"
-                />
+                {mapProvider === 'google' ? (
+                  <GoogleMap
+                    pickupLocation={activeRide.pickupCoordinates}
+                    dropoffLocation={activeRide.dropoffCoordinates}
+                    showDirections={true}
+                    height="200px"
+                  />
+                ) : (
+                  <FreeMap
+                    pickupLocation={activeRide.pickupCoordinates}
+                    dropoffLocation={activeRide.dropoffCoordinates}
+                    showDirections={true}
+                    height="200px"
+                    routePathProp={activeRideRoute}
+                  />
+                )}
               </Box>
               <CardContent>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -861,12 +950,22 @@ const DriverDashboard: React.FC = () => {
               
               <DialogContent>
                 <Box sx={{ height: '300px', mt: 2, mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-                  <GoogleMap
-                    pickupLocation={selectedRide.pickupCoordinates}
-                    dropoffLocation={selectedRide.dropoffCoordinates}
-                    showDirections={true}
-                    height="300px"
-                  />
+                  {mapProvider === 'google' ? (
+                    <GoogleMap
+                      pickupLocation={selectedRide.pickupCoordinates}
+                      dropoffLocation={selectedRide.dropoffCoordinates}
+                      showDirections={true}
+                      height="300px"
+                    />
+                  ) : (
+                    <FreeMap
+                      pickupLocation={selectedRide.pickupCoordinates}
+                      dropoffLocation={selectedRide.dropoffCoordinates}
+                      showDirections={true}
+                      height="300px"
+                      routePathProp={selectedRideRoute}
+                    />
+                  )}
                 </Box>
                 
                 <Grid container spacing={3}>

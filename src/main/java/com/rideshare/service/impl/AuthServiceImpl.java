@@ -33,6 +33,7 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(request.getRole());
+        user.setPhoneNumber(request.getPhoneNumber());
         
         // Save user to database
         User savedUser = userRepository.save(user);

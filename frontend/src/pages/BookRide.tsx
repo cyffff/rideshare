@@ -45,11 +45,13 @@ import {
   Star
 } from '@mui/icons-material';
 import GoogleMap from '../components/GoogleMap';
+import OSMMap from '../components/FreeMap';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { format, addMinutes } from 'date-fns';
+import locationService from '../services/LocationService';
 
 // Define interface for location data
 interface Location {
@@ -104,9 +106,18 @@ const rideTypes: RideType[] = [
 // Steps for the booking process
 const steps = ['Location', 'Ride Type', 'Payment'];
 
+// Interface for location state from Home page
+interface LocationState {
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  carType?: string;
+}
+
 const BookRide: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as LocationState;
   
   // State for booking flow
   const [activeStep, setActiveStep] = useState(0);
@@ -120,7 +131,9 @@ const BookRide: React.FC = () => {
   const [currentUserLocation, setCurrentUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   
   // State for ride details
-  const [selectedRideType, setSelectedRideType] = useState<string>(rideTypes[0].id);
+  const [selectedRideType, setSelectedRideType] = useState<string>(
+    locationState?.carType || rideTypes[0].id
+  );
   const [isScheduled, setIsScheduled] = useState<boolean>(false);
   const [scheduledTime, setScheduledTime] = useState<Date | null>(new Date());
   const [estimatedDistance, setEstimatedDistance] = useState<number>(0);
@@ -129,8 +142,29 @@ const BookRide: React.FC = () => {
   const [numberOfPassengers, setNumberOfPassengers] = useState<number>(1);
   const [notes, setNotes] = useState<string>('');
   
-  // Get current user location on mount
+  // State for map provider
+  const [mapProvider, setMapProvider] = useState<'google' | 'osm'>('osm');
+  
+  // State for location selection
+  const [isSelectingOnMap, setIsSelectingOnMap] = useState<boolean>(false);
+  const [selectingPickupLocation, setSelectingPickupLocation] = useState<boolean>(true);
+  
+  // Add new state for location suggestions and typing
+  const [pickupQuery, setPickupQuery] = useState('');
+  const [dropoffQuery, setDropoffQuery] = useState('');
+  const [pickupSuggestions, setPickupSuggestions] = useState<Location[]>([]);
+  const [dropoffSuggestions, setDropoffSuggestions] = useState<Location[]>([]);
+  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
+  const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(false);
+  
+  // Get current user location on mount and handle prefilled data
   useEffect(() => {
+    // Default to Dubai coordinates instead of San Francisco
+    const defaultLocation = {
+      lat: 25.2048,
+      lng: 55.2708 // Dubai coordinates
+    };
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -139,63 +173,144 @@ const BookRide: React.FC = () => {
             lng: position.coords.longitude
           });
           
-          // For demo purposes, also set a default pickup location
+          // For demo purposes, use Dubai as the default location
           const defaultPickup = {
-            address: '123 Main St, San Francisco, CA',
-            coordinates: {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            }
+            address: locationState?.pickupLocation || 'Dubai Mall, Dubai, UAE',
+            coordinates: defaultLocation
           };
           setPickupLocation(defaultPickup);
+          setPickupQuery(defaultPickup.address);
+          
+          // If dropoff was provided in state, set it
+          if (locationState?.dropoffLocation) {
+            // Create a mock dropoff location in UAE
+            const defaultDropoff = {
+              address: locationState.dropoffLocation,
+              coordinates: {
+                lat: defaultLocation.lat + 0.03, // Slightly offset from pickup
+                lng: defaultLocation.lng + 0.04
+              }
+            };
+            setDropoffLocation(defaultDropoff);
+            setDropoffQuery(defaultDropoff.address);
+            
+            // Calculate estimates for the route
+            setTimeout(() => {
+              if (pickupLocation) {
+                calculateRoute(defaultPickup, defaultDropoff);
+              }
+            }, 500);
+          }
         },
         (error) => {
           console.error("Error getting user location", error);
           
-          // Set default locations for demo
-          const defaultLocation = {
-            lat: 37.7749,
-            lng: -122.4194 // San Francisco coordinates
-          };
+          // Set default locations for demo in UAE
           setCurrentUserLocation(defaultLocation);
           
           const defaultPickup = {
-            address: '123 Main St, San Francisco, CA',
+            address: locationState?.pickupLocation || 'Dubai Mall, Dubai, UAE',
             coordinates: defaultLocation
           };
           setPickupLocation(defaultPickup);
+          setPickupQuery(defaultPickup.address);
+          
+          // If dropoff was provided in state, set it
+          if (locationState?.dropoffLocation) {
+            const defaultDropoff = {
+              address: locationState.dropoffLocation,
+              coordinates: {
+                lat: defaultLocation.lat + 0.03,
+                lng: defaultLocation.lng + 0.04
+              }
+            };
+            setDropoffLocation(defaultDropoff);
+            setDropoffQuery(defaultDropoff.address);
+            
+            // Calculate estimates for the route
+            setTimeout(() => {
+              if (pickupLocation) {
+                calculateRoute(defaultPickup, defaultDropoff);
+              }
+            }, 500);
+          }
         }
       );
     }
-  }, []);
+  }, [locationState]);
   
-  // Mock function to simulate address lookup
-  const searchAddress = (query: string, isPickup: boolean) => {
-    // In a real app, this would call a geocoding service
-    setTimeout(() => {
-      // Generate random coordinates near San Francisco
-      const baseLat = 37.7749;
-      const baseLng = -122.4194;
-      
-      const location = {
-        address: query,
-        coordinates: {
-          lat: baseLat + (Math.random() * 0.02 - 0.01),
-          lng: baseLng + (Math.random() * 0.02 - 0.01)
+  // Replace the current generateSuggestions function with this improved version
+  const generateSuggestions = async (query: string): Promise<Location[]> => {
+    if (!query || query.length < 2) return [];
+    
+    // Use the location service to get suggestions
+    const suggestions = await locationService.getSuggestions(query);
+    
+    // Convert to the Location format used in this component
+    return suggestions.map(suggestion => ({
+      address: suggestion.description,
+      coordinates: {
+        lat: suggestion.lat,
+        lng: suggestion.lng
+      }
+    }));
+  };
+  
+  // Replace the searchAddress function with this async version
+  const searchAddress = async (query: string, isPickup: boolean) => {
+    if (isPickup) {
+      setPickupQuery(query);
+      if (query.length >= 2) {
+        setLoading(true);
+        try {
+          const suggestions = await generateSuggestions(query);
+          setPickupSuggestions(suggestions);
+          setShowPickupSuggestions(true);
+        } catch (err) {
+          console.error("Error getting suggestions:", err);
+        } finally {
+          setLoading(false);
         }
-      };
-      
-      if (isPickup) {
-        setPickupLocation(location);
       } else {
-        setDropoffLocation(location);
+        setShowPickupSuggestions(false);
       }
-      
-      // If both locations are set, calculate estimated price
-      if ((isPickup && dropoffLocation) || (!isPickup && pickupLocation)) {
-        calculateEstimates();
+    } else {
+      setDropoffQuery(query);
+      if (query.length >= 2) {
+        setLoading(true);
+        try {
+          const suggestions = await generateSuggestions(query);
+          setDropoffSuggestions(suggestions);
+          setShowDropoffSuggestions(true);
+        } catch (err) {
+          console.error("Error getting suggestions:", err);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setShowDropoffSuggestions(false);
       }
-    }, 500);
+    }
+  };
+  
+  // Handle suggestion selection
+  const handleSelectSuggestion = (suggestion: Location, isPickup: boolean) => {
+    if (isPickup) {
+      setPickupLocation(suggestion);
+      setPickupQuery(suggestion.address);
+      setShowPickupSuggestions(false);
+    } else {
+      setDropoffLocation(suggestion);
+      setDropoffQuery(suggestion.address);
+      setShowDropoffSuggestions(false);
+    }
+    
+    // Only calculate route if both locations are set
+    if ((isPickup && dropoffLocation) || (!isPickup && pickupLocation)) {
+      const pickup = isPickup ? suggestion : pickupLocation!;
+      const dropoff = isPickup ? dropoffLocation! : suggestion;
+      calculateRoute(pickup, dropoff);
+    }
   };
   
   const calculateEstimates = useCallback(() => {
@@ -302,24 +417,208 @@ const BookRide: React.FC = () => {
     }
   };
   
-  const handleSetCurrentLocationAsPickup = () => {
+  // Update this part to initialize the query values when locations are already set
+  useEffect(() => {
+    if (pickupLocation && !pickupQuery) {
+      setPickupQuery(pickupLocation.address);
+    }
+  }, [pickupLocation, pickupQuery]);
+
+  useEffect(() => {
+    if (dropoffLocation && !dropoffQuery) {
+      setDropoffQuery(dropoffLocation.address);
+    }
+  }, [dropoffLocation, dropoffQuery]);
+  
+  // Replace the calculateRoute function with this improved version
+  const calculateRoute = useCallback(async (pickup: Location, dropoff: Location) => {
+    try {
+      // Get directions from the location service
+      const directions = await locationService.getDirections(
+        pickup.coordinates,
+        dropoff.coordinates
+      );
+      
+      setEstimatedDistance(directions.distance);
+      setEstimatedDuration(directions.duration);
+      
+      // Calculate price based on distance and ride type
+      calculatePrice(directions.distance);
+    } catch (err) {
+      console.error("Error calculating route:", err);
+      
+      // Fallback to basic calculation if the service fails
+      const directDistance = calculateDistance(
+        pickup.coordinates.lat,
+        pickup.coordinates.lng,
+        dropoff.coordinates.lat,
+        dropoff.coordinates.lng
+      );
+      
+      // Add realistic factor for actual roads
+      const adjustedDistance = directDistance * 1.3;
+      const duration = Math.round(adjustedDistance * 2);
+      
+      setEstimatedDistance(adjustedDistance);
+      setEstimatedDuration(duration);
+      calculatePrice(adjustedDistance);
+    }
+  }, []);
+  
+  // Improve the Current Location button functionality
+  const handleSetCurrentLocationAsPickup = async () => {
     if (currentUserLocation) {
+      let locationName = 'Current Location';
+      let coordinates = { ...currentUserLocation };
+      
+      // Get a better location name based on search context
+      if (pickupQuery && pickupQuery.length > 0) {
+        const queryLower = pickupQuery.toLowerCase();
+        
+        // Check for key location terms in the query
+        if (queryLower.includes('reem') || queryLower.includes('rem')) {
+          locationName = 'Current Location (Reem Island, Abu Dhabi)';
+          coordinates = { lat: 24.4991, lng: 54.4017 };
+        }
+        else if (queryLower.includes('abu') || queryLower.includes('dhabi') || 
+                 queryLower.includes('dbu') || queryLower.includes('abo')) {
+          locationName = 'Current Location (Abu Dhabi, UAE)';
+          coordinates = { lat: 24.4539, lng: 54.3773 };
+        } 
+        else if (queryLower.includes('dubai') || queryLower.includes('dubi') || 
+                 queryLower.includes('dubei')) {
+          locationName = 'Current Location (Dubai, UAE)';
+          coordinates = { lat: 25.2048, lng: 55.2708 };
+        }
+        else if (queryLower.includes('yas')) {
+          locationName = 'Current Location (Yas Island, Abu Dhabi)';
+          coordinates = { lat: 24.4959, lng: 54.6056 };
+        }
+        else if (queryLower.includes('saadiyat')) {
+          locationName = 'Current Location (Saadiyat Island, Abu Dhabi)';
+          coordinates = { lat: 24.5456, lng: 54.4218 };
+        }
+        else if (queryLower.includes('china') || queryLower.includes('beijing')) {
+          locationName = 'Current Location (Beijing, China)';
+          coordinates = { lat: 39.9042, lng: 116.4074 };
+        }
+        // Default to Abu Dhabi if we have text but no specific match
+        else if (queryLower.length > 0) {
+          locationName = 'Current Location (Abu Dhabi, UAE)';
+          coordinates = { lat: 24.4539, lng: 54.3773 };
+        }
+      } else {
+        // Default to Abu Dhabi for the demo
+        locationName = 'Current Location (Abu Dhabi, UAE)';
+        coordinates = { lat: 24.4539, lng: 54.3773 };
+      }
+      
       const location = {
-        address: 'Current Location',
-        coordinates: currentUserLocation
+        address: locationName,
+        coordinates: coordinates
       };
+      
       setPickupLocation(location);
+      setPickupQuery(locationName);
+      setShowPickupSuggestions(false);
       
       if (dropoffLocation) {
-        calculateEstimates();
+        calculateRoute(location, dropoffLocation);
+      }
+    } else {
+      // If geolocation is not available, provide a reasonable default
+      const defaultLocation = {
+        address: 'Current Location (Abu Dhabi, UAE)',
+        coordinates: { lat: 24.4539, lng: 54.3773 }
+      };
+      
+      setPickupLocation(defaultLocation);
+      setPickupQuery(defaultLocation.address);
+      setShowPickupSuggestions(false);
+      
+      if (dropoffLocation) {
+        calculateRoute(defaultLocation, dropoffLocation);
       }
     }
+  };
+  
+  // Update handleLocationSelect to also set the query
+  const handleLocationSelect = (location: { lat: number; lng: number }, isPickup: boolean) => {
+    // Get address from coordinates (in a real app, this would use reverse geocoding)
+    const address = isPickup 
+      ? `Pickup at ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}` 
+      : `Dropoff at ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
+    
+    const newLocation: Location = {
+      address,
+      coordinates: location
+    };
+    
+    if (isPickup) {
+      setPickupLocation(newLocation);
+      setPickupQuery(address);
+      setShowPickupSuggestions(false);
+    } else {
+      setDropoffLocation(newLocation);
+      setDropoffQuery(address);
+      setShowDropoffSuggestions(false);
+    }
+    
+    // Calculate route if both locations are set
+    if ((isPickup && dropoffLocation) || (!isPickup && pickupLocation)) {
+      calculateRoute(
+        isPickup ? newLocation : pickupLocation!,
+        isPickup ? dropoffLocation! : newLocation
+      );
+    }
+    
+    // Exit selection mode
+    setIsSelectingOnMap(false);
   };
   
   const handleSuccessDialogClose = () => {
     setShowSuccessDialog(false);
     // In a real app, you might navigate to a ride tracking page
     navigate('/ride-history');
+  };
+  
+  // Function to start location selection mode
+  const startLocationSelection = (isPickup: boolean) => {
+    setSelectingPickupLocation(isPickup);
+    setIsSelectingOnMap(true);
+  };
+  
+  // Calculate route between two locations
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 3958.8; // Earth's radius in miles
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+    
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c; // Distance in miles
+    
+    return distance;
+  };
+  
+  // Helper function to convert degrees to radians
+  const toRadians = (degrees: number): number => {
+    return degrees * (Math.PI / 180);
+  };
+  
+  // Calculate price based on distance and ride type
+  const calculatePrice = (distance: number) => {
+    const selectedRide = rideTypes.find(type => type.id === selectedRideType);
+    if (selectedRide) {
+      // Base price calculation (simplified for demo)
+      const basePrice = 5 + (distance * 2.5); // $5 base fare + $2.50 per mile
+      const finalPrice = basePrice * selectedRide.multiplier;
+      setEstimatedPrice(finalPrice);
+    }
   };
   
   // Render the location selection step
@@ -335,7 +634,7 @@ const BookRide: React.FC = () => {
             fullWidth
             label="Pickup Location"
             variant="outlined"
-            value={pickupLocation?.address || ''}
+            value={pickupQuery}
             onChange={(e) => searchAddress(e.target.value, true)}
             InputProps={{
               startAdornment: (
@@ -345,54 +644,160 @@ const BookRide: React.FC = () => {
               ),
               endAdornment: (
                 <InputAdornment position="end">
-                  <Button 
-                    size="small" 
-                    startIcon={<MyLocation />}
-                    onClick={handleSetCurrentLocationAsPickup}
-                  >
-                    Current
-                  </Button>
+                  <Box sx={{ display: 'flex' }}>
+                    <Button 
+                      size="small" 
+                      startIcon={<MyLocation />}
+                      onClick={handleSetCurrentLocationAsPickup}
+                      sx={{ mr: 1 }}
+                    >
+                      Current
+                    </Button>
+                    <Button
+                      size="small"
+                      color="primary"
+                      onClick={() => startLocationSelection(true)}
+                    >
+                      Select on Map
+                    </Button>
+                  </Box>
                 </InputAdornment>
               )
             }}
-            sx={{ mb: 2 }}
+            sx={{ mb: showPickupSuggestions ? 0 : 2 }}
           />
+          
+          {showPickupSuggestions && pickupSuggestions.length > 0 && (
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                mt: 0.5, 
+                mb: 2, 
+                maxHeight: '200px',
+                overflow: 'auto',
+                zIndex: 2,
+                position: 'relative'
+              }}
+            >
+              {pickupSuggestions.map((suggestion, index) => (
+                <Box 
+                  key={index}
+                  sx={{ 
+                    p: 1.5, 
+                    cursor: 'pointer',
+                    '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
+                    borderBottom: index < pickupSuggestions.length - 1 ? '1px solid #eee' : 'none'
+                  }}
+                  onClick={() => handleSelectSuggestion(suggestion, true)}
+                >
+                  <Typography variant="body2">{suggestion.address}</Typography>
+                </Box>
+              ))}
+            </Paper>
+          )}
           
           <TextField
             fullWidth
             label="Dropoff Location"
             variant="outlined"
-            value={dropoffLocation?.address || ''}
+            value={dropoffQuery}
             onChange={(e) => searchAddress(e.target.value, false)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
                   <LocationOn color="error" />
                 </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Button
+                    size="small"
+                    color="primary"
+                    onClick={() => startLocationSelection(false)}
+                  >
+                    Select on Map
+                  </Button>
+                </InputAdornment>
               )
             }}
+            sx={{ mb: showDropoffSuggestions ? 0 : 2 }}
           />
+          
+          {showDropoffSuggestions && dropoffSuggestions.length > 0 && (
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                mt: 0.5, 
+                mb: 2, 
+                maxHeight: '200px',
+                overflow: 'auto',
+                zIndex: 2,
+                position: 'relative'
+              }}
+            >
+              {dropoffSuggestions.map((suggestion, index) => (
+                <Box 
+                  key={index}
+                  sx={{ 
+                    p: 1.5, 
+                    cursor: 'pointer',
+                    '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
+                    borderBottom: index < dropoffSuggestions.length - 1 ? '1px solid #eee' : 'none'
+                  }}
+                  onClick={() => handleSelectSuggestion(suggestion, false)}
+                >
+                  <Typography variant="body2">{suggestion.address}</Typography>
+                </Box>
+              ))}
+            </Paper>
+          )}
         </Box>
         
-        <FormControlLabel
-          control={
-            <Radio
-              checked={!isScheduled}
-              onChange={() => setIsScheduled(false)}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box>
+            <FormControlLabel
+              control={
+                <Radio
+                  checked={!isScheduled}
+                  onChange={() => setIsScheduled(false)}
+                />
+              }
+              label="Ride now"
             />
-          }
-          label="Ride now"
-        />
-        
-        <FormControlLabel
-          control={
-            <Radio
-              checked={isScheduled}
-              onChange={() => setIsScheduled(true)}
+            
+            <FormControlLabel
+              control={
+                <Radio
+                  checked={isScheduled}
+                  onChange={() => setIsScheduled(true)}
+                />
+              }
+              label="Schedule for later"
             />
-          }
-          label="Schedule for later"
-        />
+          </Box>
+          
+          <Box>
+            <FormControlLabel
+              control={
+                <Radio
+                  checked={mapProvider === 'osm'}
+                  onChange={() => setMapProvider('osm')}
+                />
+              }
+              label="OSM"
+            />
+            
+            <FormControlLabel
+              control={
+                <Radio
+                  checked={mapProvider === 'google'}
+                  onChange={() => setMapProvider('google')}
+                />
+              }
+              label="Google Map"
+            />
+          </Box>
+        </Box>
         
         {isScheduled && (
           <Box sx={{ mt: 2 }}>
@@ -421,21 +826,35 @@ const BookRide: React.FC = () => {
         )}
       </Paper>
       
-      <Paper elevation={0} sx={{ 
+      <Paper sx={{ 
         p: 2, 
         borderRadius: 2, 
         border: `1px solid ${theme.palette.divider}`,
         height: '300px', 
         overflow: 'hidden'
       }}>
-        <GoogleMap
-          pickupLocation={pickupLocation?.coordinates}
-          dropoffLocation={dropoffLocation?.coordinates}
-          currentLocation={currentUserLocation || undefined}
-          showDirections={!!(pickupLocation && dropoffLocation)}
-          height="100%"
-          onRouteCalculated={handleRouteCalculated}
-        />
+        {mapProvider === 'google' ? (
+          <GoogleMap
+            pickupLocation={pickupLocation?.coordinates}
+            dropoffLocation={dropoffLocation?.coordinates}
+            currentLocation={currentUserLocation || undefined}
+            showDirections={!!(pickupLocation && dropoffLocation)}
+            height="100%"
+            onRouteCalculated={handleRouteCalculated}
+          />
+        ) : (
+          <OSMMap
+            pickupLocation={pickupLocation?.coordinates}
+            dropoffLocation={dropoffLocation?.coordinates}
+            currentLocation={currentUserLocation || undefined}
+            showDirections={!!(pickupLocation && dropoffLocation)}
+            height="100%"
+            onRouteCalculated={handleRouteCalculated}
+            onLocationSelect={handleLocationSelect}
+            isSelectingLocation={isSelectingOnMap}
+            selectingPickup={selectingPickupLocation}
+          />
+        )}
       </Paper>
       
       {pickupLocation && dropoffLocation && (
@@ -831,6 +1250,214 @@ const BookRide: React.FC = () => {
     }
   };
   
+  // Replace the Success Dialog with this enhanced version
+  const renderSuccessDialog = () => (
+    <Dialog
+      open={showSuccessDialog}
+      onClose={handleSuccessDialogClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle>
+        <Box display="flex" alignItems="center">
+          <CheckCircle color="success" sx={{ mr: 1, fontSize: 30 }} />
+          <Typography variant="h5" fontWeight="bold">Ride Booked Successfully!</Typography>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent>
+        {/* Map view */}
+        <Box sx={{ height: '250px', mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+          {mapProvider === 'google' ? (
+            <GoogleMap
+              pickupLocation={pickupLocation?.coordinates}
+              dropoffLocation={dropoffLocation?.coordinates}
+              showDirections={true}
+              height="250px"
+            />
+          ) : (
+            <OSMMap
+              pickupLocation={pickupLocation?.coordinates}
+              dropoffLocation={dropoffLocation?.coordinates}
+              showDirections={true}
+              height="250px"
+            />
+          )}
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body1">
+            {isScheduled && scheduledTime 
+              ? `Your ride is scheduled for ${format(scheduledTime, 'PPp')}.`
+              : 'Your ride has been booked and a driver will be assigned shortly.'}
+          </Typography>
+        </Box>
+        
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            backgroundColor: alpha(theme.palette.success.main, 0.1),
+            borderRadius: 1,
+            mb: 3
+          }}
+        >
+          <Box display="flex" justifyContent="space-between">
+            <Box>
+              <Typography variant="body2">Confirmation #</Typography>
+              <Typography variant="subtitle1" fontWeight="bold">
+                {Math.random().toString(36).substring(2, 10).toUpperCase()}
+              </Typography>
+            </Box>
+            
+            <Box>
+              <Typography variant="body2">Estimated Arrival</Typography>
+              <Typography variant="subtitle1" fontWeight="bold">
+                {isScheduled && scheduledTime 
+                  ? format(scheduledTime, 'h:mm a')
+                  : format(addMinutes(new Date(), 5), 'h:mm a')}
+              </Typography>
+            </Box>
+            
+            <Box>
+              <Typography variant="body2">Price</Typography>
+              <Typography variant="subtitle1" fontWeight="bold" color="primary">
+                ${estimatedPrice.toFixed(2)}
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* Ride Details Panel */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            borderRadius: 1,
+            border: `1px solid ${theme.palette.divider}`,
+            mb: 3
+          }}
+        >
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            Ride Details
+          </Typography>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Box display="flex" alignItems="flex-start" mb={1.5}>
+                <LocationOn color="primary" fontSize="small" sx={{ mt: 0.5, mr: 1 }} />
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Pickup
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {pickupLocation?.address}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box display="flex" alignItems="flex-start">
+                <LocationOn color="error" fontSize="small" sx={{ mt: 0.5, mr: 1 }} />
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Dropoff
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {dropoffLocation?.address}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Box display="flex" alignItems="center" mb={1.5}>
+                <DirectionsCar fontSize="small" sx={{ mr: 1 }} />
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Ride Type
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {rideTypes.find(ride => ride.id === selectedRideType)?.name || 'Economy'}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box display="flex" alignItems="center">
+                <AccessTime fontSize="small" sx={{ mr: 1 }} />
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Est. Duration
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {Math.round(estimatedDuration)} min ({estimatedDistance.toFixed(1)} miles)
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
+        
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            Your Driver
+          </Typography>
+          
+          <Box display="flex" alignItems="center">
+            <Avatar
+              sx={{ 
+                width: 50, 
+                height: 50, 
+                mr: 2, 
+                bgcolor: theme.palette.primary.main 
+              }}
+            >
+              JD
+            </Avatar>
+            
+            <Box>
+              <Typography variant="subtitle1">John Driver</Typography>
+              <Box display="flex" alignItems="center">
+                <Rating
+                  value={4.8}
+                  precision={0.1}
+                  readOnly
+                  size="small"
+                  sx={{ mr: 1 }}
+                />
+                <Typography variant="body2">4.8 (328 rides)</Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+        
+        <Typography variant="body2" color="text.secondary">
+          You can view your ride details and track your driver in the Ride History section.
+        </Typography>
+      </DialogContent>
+      
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button
+          variant="outlined"
+          onClick={handleSuccessDialogClose}
+        >
+          Close
+        </Button>
+        
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSuccessDialogClose}
+          startIcon={<DirectionsCar />}
+        >
+          View Ride Status
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+  
   return (
     <Container maxWidth="md">
       <Box sx={{ py: 4 }}>
@@ -877,122 +1504,7 @@ const BookRide: React.FC = () => {
       </Box>
       
       {/* Success Dialog */}
-      <Dialog
-        open={showSuccessDialog}
-        onClose={handleSuccessDialogClose}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: 2 }
-        }}
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center">
-            <CheckCircle color="success" sx={{ mr: 1, fontSize: 30 }} />
-            <Typography variant="h5" fontWeight="bold">Ride Booked Successfully!</Typography>
-          </Box>
-        </DialogTitle>
-        
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body1">
-              {isScheduled && scheduledTime 
-                ? `Your ride is scheduled for ${format(scheduledTime, 'PPp')}.`
-                : 'Your ride has been booked and a driver will be assigned shortly.'}
-            </Typography>
-          </Box>
-          
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2,
-              backgroundColor: alpha(theme.palette.success.main, 0.1),
-              borderRadius: 1,
-              mb: 3
-            }}
-          >
-            <Box display="flex" justifyContent="space-between">
-              <Box>
-                <Typography variant="body2">Confirmation #</Typography>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  {Math.random().toString(36).substring(2, 10).toUpperCase()}
-                </Typography>
-              </Box>
-              
-              <Box>
-                <Typography variant="body2">Estimated Arrival</Typography>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  {isScheduled && scheduledTime 
-                    ? format(scheduledTime, 'h:mm a')
-                    : format(addMinutes(new Date(), 5), 'h:mm a')}
-                </Typography>
-              </Box>
-              
-              <Box>
-                <Typography variant="body2">Price</Typography>
-                <Typography variant="subtitle1" fontWeight="bold" color="primary">
-                  ${estimatedPrice.toFixed(2)}
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
-          
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Your Driver
-            </Typography>
-            
-            <Box display="flex" alignItems="center">
-              <Avatar
-                sx={{ 
-                  width: 50, 
-                  height: 50, 
-                  mr: 2, 
-                  bgcolor: theme.palette.primary.main 
-                }}
-              >
-                JD
-              </Avatar>
-              
-              <Box>
-                <Typography variant="subtitle1">John Driver</Typography>
-                <Box display="flex" alignItems="center">
-                  <Rating
-                    value={4.8}
-                    precision={0.1}
-                    readOnly
-                    size="small"
-                    sx={{ mr: 1 }}
-                  />
-                  <Typography variant="body2">4.8 (328 rides)</Typography>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-          
-          <Typography variant="body2" color="text.secondary">
-            You can view your ride details and track your driver in the Ride History section.
-          </Typography>
-        </DialogContent>
-        
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button
-            variant="outlined"
-            onClick={handleSuccessDialogClose}
-          >
-            Close
-          </Button>
-          
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleSuccessDialogClose}
-            startIcon={<DirectionsCar />}
-          >
-            View Ride Status
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {renderSuccessDialog()}
     </Container>
   );
 };

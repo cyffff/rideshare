@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { PersonAddOutlined } from '@mui/icons-material';
+import { authAPI } from '../services/api';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -103,16 +104,22 @@ const Register: React.FC = () => {
     setSubmitError('');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Send registration data to the backend
+      await authAPI.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        phoneNumber: formData.phoneNumber
+      });
       
-      // Demo registration
       setShowSuccess(true);
       setTimeout(() => {
         navigate('/login');
       }, 2000);
-    } catch (err) {
-      setSubmitError('Registration failed. Please try again.');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
+      setSubmitError(errorMessage);
       setShowError(true);
     } finally {
       setLoading(false);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Box,
@@ -12,7 +12,13 @@ import {
   Paper,
   Divider,
   Avatar,
-  alpha
+  alpha,
+  TextField,
+  InputAdornment,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import {
   DirectionsCar,
@@ -23,13 +29,42 @@ import {
   Speed,
   Security,
   SupervisorAccount,
-  LocationOn
+  LocationOn,
+  MyLocation,
+  Place,
+  ArrowForward
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { colors } from '../theme';
 
 const Home: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [pickupLocation, setPickupLocation] = useState('');
+  const [dropoffLocation, setDropoffLocation] = useState('');
+  const [carType, setCarType] = useState('economy');
+
+  const handleCarTypeChange = (event: SelectChangeEvent) => {
+    setCarType(event.target.value as string);
+  };
+
+  const handleQuickBook = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    
+    // Navigate to book ride with pre-filled info
+    navigate('/book-ride', { 
+      state: { 
+        pickupLocation, 
+        dropoffLocation,
+        carType
+      } 
+    });
+  };
 
   const features = [
     {
@@ -104,36 +139,76 @@ const Home: React.FC = () => {
       {/* Hero Section */}
       <Box
         sx={{
-          height: '80vh',
-          background: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://images.unsplash.com/photo-1485832329521-e944d75fa65e?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')`,
+          height: '90vh',
+          background: theme.palette.mode === 'dark'
+            ? `linear-gradient(rgba(10, 35, 66, 0.8), rgba(10, 35, 66, 0.9)), url('https://images.unsplash.com/photo-1485832329521-e944d75fa65e?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')`
+            : `linear-gradient(rgba(35, 100, 170, 0.7), rgba(10, 35, 66, 0.85)), url('https://images.unsplash.com/photo-1485832329521-e944d75fa65e?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
           display: 'flex',
           alignItems: 'center',
-          color: 'white'
+          color: 'white',
+          position: 'relative'
         }}
       >
-        <Container maxWidth="lg">
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: { xs: '100%', md: '50%' },
+            height: '100%',
+            background: `radial-gradient(circle at 70% 50%, ${alpha(theme.palette.primary.main, 0.2)} 0%, transparent 70%)`,
+            zIndex: 0
+          }}
+        />
+        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
           <Grid container spacing={4}>
             <Grid item xs={12} md={6}>
-              <Typography variant="h2" component="h1" fontWeight="bold" gutterBottom>
-                Your Ride, Your Way
+              <Typography 
+                variant="h2" 
+                component="h1" 
+                fontWeight="bold" 
+                gutterBottom
+                sx={{ 
+                  fontSize: { xs: '2.5rem', sm: '3.5rem', md: '4rem' },
+                  textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                  lineHeight: 1.1,
+                  mb: 2
+                }}
+              >
+                Your Ride, <br />
+                <Box component="span" sx={{ color: theme.palette.secondary.light }}>Your Way</Box>
               </Typography>
-              <Typography variant="h5" sx={{ mb: 4, fontWeight: 300 }}>
-                Fast, reliable rides for any destination. Book in seconds, travel in comfort.
+              <Typography 
+                variant="h5" 
+                sx={{ 
+                  mb: 4, 
+                  fontWeight: 300,
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  maxWidth: '600px',
+                  lineHeight: 1.4
+                }}
+              >
+                Fast, reliable rides for any destination. Book in seconds, travel in comfort, arrive on time.
               </Typography>
-              <Box sx={{ display: 'flex', gap: 2 }}>
+              <Box sx={{ display: 'flex', gap: 2, mt: 4, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
                 <Button
                   variant="contained"
                   size="large"
-                  color="primary"
+                  color="secondary"
                   onClick={() => navigate('/book-ride')}
                   sx={{ 
                     px: 4, 
-                    py: 1.5,
+                    py: 1.75,
                     fontSize: '1.1rem',
-                    borderRadius: 2
+                    borderRadius: '30px',
+                    fontWeight: 600,
+                    boxShadow: '0 8px 20px rgba(234, 115, 23, 0.3)',
+                    flexGrow: { xs: 1, sm: 0 }
                   }}
+                  endIcon={<ArrowForward />}
                 >
                   Book a Ride
                 </Button>
@@ -142,15 +217,19 @@ const Home: React.FC = () => {
                   size="large"
                   sx={{ 
                     px: 4, 
-                    py: 1.5,
+                    py: 1.75,
                     fontSize: '1.1rem',
-                    borderRadius: 2,
+                    borderRadius: '30px',
+                    fontWeight: 600,
                     color: 'white',
                     borderColor: 'white',
+                    borderWidth: '2px',
                     '&:hover': {
                       borderColor: 'white',
+                      borderWidth: '2px',
                       backgroundColor: 'rgba(255,255,255,0.1)'
-                    }
+                    },
+                    flexGrow: { xs: 1, sm: 0 }
                   }}
                   onClick={() => navigate('/driver-dashboard')}
                 >
@@ -161,6 +240,92 @@ const Home: React.FC = () => {
           </Grid>
         </Container>
       </Box>
+
+      {/* Quick Booking Section */}
+      <Container maxWidth="lg" sx={{ mt: -5, mb: 8, position: 'relative', zIndex: 2 }}>
+        <Paper 
+          elevation={6} 
+          sx={{ 
+            p: 4, 
+            borderRadius: 3,
+            backgroundColor: 'white'
+          }}
+        >
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h5" component="h2" fontWeight="bold" gutterBottom>
+                Quick Booking
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Enter your pickup and destination to get started
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Pickup Location"
+                value={pickupLocation}
+                onChange={(e) => setPickupLocation(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <MyLocation color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+                placeholder="Enter pickup location"
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Destination"
+                value={dropoffLocation}
+                onChange={(e) => setDropoffLocation(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Place color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+                placeholder="Enter drop-off location"
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <Select
+                  value={carType}
+                  onChange={handleCarTypeChange}
+                  displayEmpty
+                >
+                  <MenuItem value="economy">Economy</MenuItem>
+                  <MenuItem value="comfort">Comfort</MenuItem>
+                  <MenuItem value="premium">Premium</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sx={{ mt: 2, textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleQuickBook}
+                sx={{ 
+                  minWidth: '200px',
+                  borderRadius: '30px',
+                  py: 1.5
+                }}
+              >
+                Find a Ride
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      </Container>
 
       {/* Features Section */}
       <Container maxWidth="lg" sx={{ py: 10 }}>
@@ -386,7 +551,7 @@ const Home: React.FC = () => {
             </Box>
           </Grid>
         </Grid>
-      </Box>
+      </Container>
 
       {/* Testimonials Section */}
       <Box sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05), py: 10 }}>

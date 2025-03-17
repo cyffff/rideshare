@@ -21,7 +21,9 @@ import {
   Rating,
   Alert,
   useTheme,
-  alpha
+  alpha,
+  FormControlLabel,
+  Radio
 } from '@mui/material';
 import {
   DirectionsCar,
@@ -37,8 +39,10 @@ import {
   Cancel
 } from '@mui/icons-material';
 import GoogleMap from '../components/GoogleMap';
+import FreeMap from '../components/FreeMap';
 import { format, parseISO } from 'date-fns';
 import axios from 'axios';
+import locationService from '../services/LocationService';
 
 // Define ride interface
 interface Ride {
@@ -82,6 +86,8 @@ const RideHistory: React.FC = () => {
   const [ratingValue, setRatingValue] = useState<number>(0);
   const [ratingSubmitting, setRatingSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapProvider, setMapProvider] = useState<'google' | 'free'>('free');
+  const [routePath, setRoutePath] = useState<{lat: number; lng: number}[]>([]);
 
   useEffect(() => {
     fetchRides();
@@ -257,6 +263,26 @@ const RideHistory: React.FC = () => {
     return rides;
   };
 
+  const loadRouteData = async (ride: Ride) => {
+    try {
+      const directions = await locationService.getDirections(
+        ride.pickupCoordinates,
+        ride.dropoffCoordinates
+      );
+      
+      setRoutePath(directions.waypoints);
+    } catch (error) {
+      console.error("Error loading route data:", error);
+      setRoutePath([]);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedRide && detailsOpen) {
+      loadRouteData(selectedRide);
+    }
+  }, [selectedRide, detailsOpen]);
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
@@ -266,7 +292,36 @@ const RideHistory: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" component="h1" fontWeight="bold">
+          Your Ride History
+        </Typography>
+        
+        <Box>
+          <FormControlLabel
+            control={
+              <Radio
+                checked={mapProvider === 'free'}
+                onChange={() => setMapProvider('free')}
+                size="small"
+              />
+            }
+            label="Free Map"
+          />
+          <FormControlLabel
+            control={
+              <Radio
+                checked={mapProvider === 'google'}
+                onChange={() => setMapProvider('google')}
+                size="small"
+              />
+            }
+            label="Google Map"
+          />
+        </Box>
+      </Box>
+      
       <Paper elevation={3} sx={{ p: 4, my: 4, borderRadius: 2 }}>
         <Box display="flex" alignItems="center" mb={4}>
           <History sx={{ fontSize: 32, mr: 2, color: theme.palette.primary.main }} />
@@ -443,12 +498,22 @@ const RideHistory: React.FC = () => {
               
               <DialogContent>
                 <Box sx={{ height: '250px', mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-                  <GoogleMap
-                    pickupLocation={selectedRide.pickupCoordinates}
-                    dropoffLocation={selectedRide.dropoffCoordinates}
-                    showDirections={true}
-                    height="250px"
-                  />
+                  {mapProvider === 'google' ? (
+                    <GoogleMap
+                      pickupLocation={selectedRide.pickupCoordinates}
+                      dropoffLocation={selectedRide.dropoffCoordinates}
+                      showDirections={true}
+                      height="250px"
+                    />
+                  ) : (
+                    <FreeMap
+                      pickupLocation={selectedRide.pickupCoordinates}
+                      dropoffLocation={selectedRide.dropoffCoordinates}
+                      showDirections={true}
+                      height="250px"
+                      routePathProp={routePath}
+                    />
+                  )}
                 </Box>
                 
                 <Grid container spacing={3}>
