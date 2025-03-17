@@ -36,6 +36,8 @@ public class User {
     
     private Double rating = 5.0;
     
+    private Integer ratingCount = 0;
+    
     private Integer totalRides = 0;
     
     private Boolean isVerified = false;

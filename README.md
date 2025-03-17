@@ -1,118 +1,186 @@
+# Getting Started with Create React App
+
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+## Available Scripts
+
+In the project directory, you can run:
+
+### `npm start`
+
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+
+The page will reload if you make edits.\
+You will also see any lint errors in the console.
+
+### `npm test`
+
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+
+### `npm run build`
+
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
+
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
+
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+
+### `npm run eject`
+
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+
+## Learn More
+
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+
+To learn React, check out the [React documentation](https://reactjs.org/).
+
 # RideShare Application
 
 A modern ride-sharing platform built with Spring Boot and React.
 
 ## Features
 
-- **User Authentication**: Secure login and registration for passengers and drivers
-- **Ride Booking**: Request, schedule, and track rides in real-time
-- **Driver Dashboard**: Accept rides, navigate to pickup locations, and manage earnings
-- **Ride History**: View past rides, ratings, and receipts
-- **Payment Processing**: Secure payment handling with Stripe integration
-- **Shared Rides**: Option to share rides with other passengers for reduced costs
-- **Rating System**: Rate drivers and passengers after completed rides
+- **User Authentication**: Secure login and registration system with JWT
+- **Ride Booking**: Easy-to-use interface for booking rides
+- **Driver Dashboard**: Comprehensive dashboard for drivers to manage rides
+- **Real-time Tracking**: Track rides in real-time (simulated)
+- **Payment Processing**: Integrated payment system with Stripe
+- **Ride History**: View past rides and ratings
+- **Rating System**: Rate drivers and passengers after rides
 
 ## Technology Stack
 
 ### Backend
-- Java 17
-- Spring Boot 3.x
-- Spring Security with JWT
-- Spring Data JPA
-- PostgreSQL
-- Stripe API for payments
-- WebSockets for real-time updates
+- **Java 17**
+- **Spring Boot 3.0**
+- **Spring Security** with JWT Authentication
+- **Spring Data JPA** with MySQL
+- **Maven** for dependency management
+- **Stripe API** for payment processing
 
 ### Frontend
-- React 18
-- TypeScript
-- Material-UI
-- Google Maps API
-- Stripe Elements for payment UI
-- Axios for API communication
+- **React 19** with TypeScript
+- **React Router** for navigation
+- **Material-UI** for modern UI components
+- **Axios** for API requests
+- **Google Maps API** integration (simulated)
 
-## Getting Started
+## Project Structure
+
+The project is organized as a monorepo with backend and frontend directories:
+
+```
+rideshare/
+├── src/                  # Backend Java code
+│   └── main/
+│       ├── java/         # Java source files
+│       └── resources/    # Application properties
+├── frontend/             # React frontend
+│   ├── public/           # Static assets
+│   └── src/              # React components
+├── pom.xml               # Maven configuration
+└── README.md
+```
+
+## Setup Instructions
 
 ### Prerequisites
-- Java 17+
-- Node.js 16+
-- PostgreSQL
-- Stripe account (for payment processing)
-- Google Maps API key
+- Java 17 or higher
+- Node.js 16 or higher
+- Maven 3.6 or higher
+- MySQL 8.0 or higher
+
+### Database Setup
+1. Create a MySQL database:
+```sql
+CREATE DATABASE rideshare;
+```
+
+2. Configure the database connection in `src/main/resources/application.yml`
 
 ### Backend Setup
+1. Navigate to the project root directory
+2. Build the project:
+```bash
+mvn clean install -DskipTests
+```
+3. Run the Spring Boot application:
+```bash
+mvn spring-boot:run
+```
 
-1. Clone the repository
-   ```
-   git clone https://github.com/yourusername/rideshare.git
-   cd rideshare
-   ```
-
-2. Configure database in `application.properties`
-   ```
-   spring.datasource.url=jdbc:postgresql://localhost:5432/rideshare
-   spring.datasource.username=postgres
-   spring.datasource.password=yourpassword
-   ```
-
-3. Add your Stripe API keys to `application.properties`
-   ```
-   stripe.api.key=your_stripe_secret_key
-   stripe.publishable.key=your_stripe_publishable_key
-   ```
-
-4. Build and run the application
-   ```
-   ./mvnw spring-boot:run
-   ```
+The backend server will start on http://localhost:8080
 
 ### Frontend Setup
+1. Navigate to the frontend directory:
+```bash
+cd frontend
+```
+2. Install dependencies:
+```bash
+npm install
+```
+3. Start the development server:
+```bash
+npm start
+```
 
-1. Navigate to the frontend directory
-   ```
-   cd frontend
-   ```
+The frontend will be available at http://localhost:3000
 
-2. Install dependencies
-   ```
-   npm install
-   ```
+## Running the Application
 
-3. Create a `.env` file with your Google Maps API key
-   ```
-   REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
-   ```
+To run both services at once:
 
-4. Start the development server
-   ```
-   npm start
-   ```
+1. Start the backend server first:
+```bash
+mvn spring-boot:run
+```
 
-5. Access the application at `http://localhost:3000`
+2. In a new terminal, start the frontend:
+```bash
+cd frontend && npm start
+```
+
+3. Access the application at http://localhost:3000
+
+## Demo Credentials
+
+You can use the following demo credentials to test the application:
+
+- **Passenger**:
+  - Email: demo@example.com
+  - Password: password
+
+- **Driver**:
+  - Email: driver@example.com
+  - Password: password
 
 ## API Documentation
 
-The API documentation is available at `/swagger-ui.html` when the backend is running.
+The API documentation is available at http://localhost:8080/swagger-ui.html when the backend server is running.
 
-## Database Schema
-
-The application uses the following main entities:
-- User (with roles: PASSENGER, DRIVER, ADMIN)
-- Ride
-- Payment
-- Rating
-
-## Contributing
+## Contribution Guidelines
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch: `git checkout -b feature-name`
+3. Commit your changes: `git commit -m 'Add some feature'`
+4. Push to the branch: `git push origin feature-name`
+5. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## Acknowledgments
 

@@ -20,10 +20,16 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
     
     List<Ride> findByStatusAndIsShared(RideStatus status, Boolean isShared);
     
+    List<Ride> findByIsSharedAndStatusIn(Boolean isShared, List<RideStatus> statuses);
+    
+    List<Ride> findByDriverAndStatusIn(User driver, List<RideStatus> statuses);
+    
+    List<Ride> findByPassengerAndStatusIn(User passenger, List<RideStatus> statuses);
+    
     @Query("SELECT r FROM Ride r WHERE r.status = :status AND r.driver = NULL")
     List<Ride> findAvailableRides(RideStatus status);
     
-    @Query("SELECT r FROM Ride r WHERE r.isScheduled = true AND r.scheduledTime BETWEEN :start AND :end")
+    @Query("SELECT r FROM Ride r WHERE r.rideTime BETWEEN :start AND :end")
     List<Ride> findScheduledRidesBetween(LocalDateTime start, LocalDateTime end);
     
     @Query("SELECT r FROM Ride r WHERE r.driver = :driver AND r.status IN ('ACCEPTED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS')")

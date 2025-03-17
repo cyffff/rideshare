@@ -16,9 +16,9 @@ public interface UserService {
     /**
      * Find a user by email
      * @param email User email
-     * @return Optional containing the user if found
+     * @return User object
      */
-    Optional<User> findByEmail(String email);
+    User findByEmail(String email);
     
     /**
      * Save a user to the database
@@ -51,10 +51,10 @@ public interface UserService {
     /**
      * Update a user's profile information
      * @param userId User ID
-     * @param updatedUser User object with updated information
+     * @param userDetails User object with updated information
      * @return The updated user
      */
-    User updateProfile(Long userId, User updatedUser);
+    User updateProfile(Long userId, User userDetails);
     
     /**
      * Update a user's location
@@ -63,7 +63,7 @@ public interface UserService {
      * @param longitude Longitude
      * @return The updated user
      */
-    User updateLocation(Long userId, Double latitude, Double longitude);
+    void updateLocation(Long userId, Double latitude, Double longitude);
     
     /**
      * Find drivers near a location
@@ -80,5 +80,11 @@ public interface UserService {
      * @param rating New rating value
      * @return The updated user
      */
-    User updateRating(Long userId, Double rating);
+    void updateRating(Long userId, Double rating);
+    
+    /**
+     * Increment a user's total rides
+     * @param userId User ID
+     */
+    void incrementTotalRides(Long userId);
 } 

@@ -1,77 +1,563 @@
 import React from 'react';
-import { Container, Typography, Button, Box, Grid, Paper } from '@mui/material';
+import {
+  Container,
+  Box,
+  Typography,
+  Button,
+  Grid,
+  Card,
+  CardContent,
+  CardMedia,
+  useTheme,
+  Paper,
+  Divider,
+  Avatar,
+  alpha
+} from '@mui/material';
+import {
+  DirectionsCar,
+  AccessTime,
+  CreditCard,
+  Star,
+  LocalTaxi,
+  Speed,
+  Security,
+  SupervisorAccount,
+  LocationOn
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import LocalTaxiIcon from '@mui/icons-material/LocalTaxi';
 
-const Home = () => {
+const Home: React.FC = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
 
+  const features = [
+    {
+      title: 'Quick Booking',
+      description: 'Book a ride in seconds with our streamlined booking process.',
+      icon: <AccessTime fontSize="large" sx={{ color: theme.palette.primary.main }} />
+    },
+    {
+      title: 'Secure Payments',
+      description: 'Payments are secure and can be made with credit cards or PayPal.',
+      icon: <CreditCard fontSize="large" sx={{ color: theme.palette.primary.main }} />
+    },
+    {
+      title: 'Top Rated Drivers',
+      description: 'Our drivers are carefully vetted and highly rated by users.',
+      icon: <Star fontSize="large" sx={{ color: theme.palette.primary.main }} />
+    },
+    {
+      title: 'Real-time Tracking',
+      description: 'Track your ride in real-time and share your journey with loved ones.',
+      icon: <LocationOn fontSize="large" sx={{ color: theme.palette.primary.main }} />
+    }
+  ];
+
+  const carTypes = [
+    {
+      name: 'Economy',
+      description: 'Affordable rides for everyday use',
+      imageUrl: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+      icon: <LocalTaxi />,
+      price: 'From $10'
+    },
+    {
+      name: 'Comfort',
+      description: 'Newer cars with extra legroom',
+      imageUrl: 'https://images.unsplash.com/photo-1550355291-bbee04a92027?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+      icon: <DirectionsCar />,
+      price: 'From $15'
+    },
+    {
+      name: 'Premium',
+      description: 'Luxury vehicles with top-rated drivers',
+      imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+      icon: <Speed />,
+      price: 'From $25'
+    }
+  ];
+
+  const testimonials = [
+    {
+      name: 'Emily Johnson',
+      text: 'The app is so easy to use! I love the real-time tracking feature that lets me share my journey with family.',
+      rating: 5,
+      avatar: 'E'
+    },
+    {
+      name: 'Michael Chen',
+      text: 'Great service and professional drivers. The ability to schedule rides in advance is super helpful for my business trips.',
+      rating: 4,
+      avatar: 'M'
+    },
+    {
+      name: 'Sarah Williams',
+      text: 'I feel safe using this ride service even late at night. The drivers are courteous and the cars are always clean.',
+      rating: 5,
+      avatar: 'S'
+    }
+  ];
+
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 8, mb: 4 }}>
-        <Typography variant="h2" component="h1" gutterBottom align="center">
-          Welcome to RideShare
-        </Typography>
-        <Typography variant="h5" align="center" color="text.secondary" paragraph>
-          Your trusted ride-sharing platform. Book a ride or become a driver today!
-        </Typography>
-        <Box sx={{ mt: 4 }}>
-          <Grid container spacing={4} justifyContent="center">
+    <Box>
+      {/* Hero Section */}
+      <Box
+        sx={{
+          height: '80vh',
+          background: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://images.unsplash.com/photo-1485832329521-e944d75fa65e?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          color: 'white'
+        }}
+      >
+        <Container maxWidth="lg">
+          <Grid container spacing={4}>
             <Grid item xs={12} md={6}>
-              <Paper
-                sx={{
-                  p: 4,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  '&:hover': { transform: 'scale(1.02)' },
-                  transition: 'transform 0.2s',
-                }}
-                onClick={() => navigate('/book-ride')}
-              >
-                <LocalTaxiIcon sx={{ fontSize: 60, mb: 2, color: 'primary.main' }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Need a Ride?
-                </Typography>
-                <Typography align="center" color="text.secondary" paragraph>
-                  Book a ride now and get to your destination safely and comfortably.
-                </Typography>
-                <Button variant="contained" color="primary" size="large">
+              <Typography variant="h2" component="h1" fontWeight="bold" gutterBottom>
+                Your Ride, Your Way
+              </Typography>
+              <Typography variant="h5" sx={{ mb: 4, fontWeight: 300 }}>
+                Fast, reliable rides for any destination. Book in seconds, travel in comfort.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  color="primary"
+                  onClick={() => navigate('/book-ride')}
+                  sx={{ 
+                    px: 4, 
+                    py: 1.5,
+                    fontSize: '1.1rem',
+                    borderRadius: 2
+                  }}
+                >
                   Book a Ride
                 </Button>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper
-                sx={{
-                  p: 4,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  '&:hover': { transform: 'scale(1.02)' },
-                  transition: 'transform 0.2s',
-                }}
-                onClick={() => navigate('/register')}
-              >
-                <DirectionsCarIcon sx={{ fontSize: 60, mb: 2, color: 'secondary.main' }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Become a Driver
-                </Typography>
-                <Typography align="center" color="text.secondary" paragraph>
-                  Join our community of drivers and start earning on your own schedule.
-                </Typography>
-                <Button variant="contained" color="secondary" size="large">
-                  Register as Driver
+                <Button
+                  variant="outlined"
+                  size="large"
+                  sx={{ 
+                    px: 4, 
+                    py: 1.5,
+                    fontSize: '1.1rem',
+                    borderRadius: 2,
+                    color: 'white',
+                    borderColor: 'white',
+                    '&:hover': {
+                      borderColor: 'white',
+                      backgroundColor: 'rgba(255,255,255,0.1)'
+                    }
+                  }}
+                  onClick={() => navigate('/driver-dashboard')}
+                >
+                  Drive With Us
                 </Button>
-              </Paper>
+              </Box>
             </Grid>
           </Grid>
-        </Box>
+        </Container>
       </Box>
-    </Container>
+
+      {/* Features Section */}
+      <Container maxWidth="lg" sx={{ py: 10 }}>
+        <Box textAlign="center" mb={8}>
+          <Typography variant="h3" component="h2" fontWeight="bold" gutterBottom>
+            Why Choose Us
+          </Typography>
+          <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+            Experience the future of transportation with our feature-rich ride-sharing platform.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={4}>
+          {features.map((feature, index) => (
+            <Grid item xs={12} sm={6} md={3} key={index}>
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: 4, 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  textAlign: 'center',
+                  borderRadius: 4,
+                  transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    boxShadow: 6
+                  }
+                }}
+              >
+                <Box mb={2}>
+                  {feature.icon}
+                </Box>
+                <Typography variant="h5" component="h3" gutterBottom fontWeight="bold">
+                  {feature.title}
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  {feature.description}
+                </Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      </Container>
+
+      {/* Car Types Section */}
+      <Box sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05), py: 10 }}>
+        <Container maxWidth="lg">
+          <Box textAlign="center" mb={8}>
+            <Typography variant="h3" component="h2" fontWeight="bold" gutterBottom>
+              Our Ride Options
+            </Typography>
+            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+              Choose the perfect ride for your needs, from budget-friendly to premium luxury.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={4}>
+            {carTypes.map((carType, index) => (
+              <Grid item xs={12} md={4} key={index}>
+                <Card 
+                  sx={{ 
+                    height: '100%', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    borderRadius: 4, 
+                    overflow: 'hidden',
+                    transition: 'transform 0.3s ease-in-out',
+                    '&:hover': {
+                      transform: 'scale(1.03)'
+                    }
+                  }}
+                >
+                  <CardMedia
+                    component="img"
+                    height="200"
+                    image={carType.imageUrl}
+                    alt={carType.name}
+                  />
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box display="flex" alignItems="center" mb={1}>
+                      <Box sx={{ 
+                        p: 1, 
+                        borderRadius: '50%', 
+                        backgroundColor: theme.palette.primary.main, 
+                        color: 'white',
+                        mr: 2
+                      }}>
+                        {carType.icon}
+                      </Box>
+                      <Typography variant="h5" component="h3" fontWeight="bold">
+                        {carType.name}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1" paragraph color="text.secondary">
+                      {carType.description}
+                    </Typography>
+                    <Typography variant="h6" color="primary" fontWeight="bold">
+                      {carType.price}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Box textAlign="center" mt={6}>
+            <Button 
+              variant="contained" 
+              size="large" 
+              onClick={() => navigate('/book-ride')}
+              sx={{ 
+                px: 4, 
+                py: 1.5,
+                borderRadius: 2
+              }}
+            >
+              Book Now
+            </Button>
+          </Box>
+        </Container>
+      </Box>
+
+      {/* How It Works Section */}
+      <Container maxWidth="lg" sx={{ py: 10 }}>
+        <Box textAlign="center" mb={8}>
+          <Typography variant="h3" component="h2" fontWeight="bold" gutterBottom>
+            How It Works
+          </Typography>
+          <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+            Getting a ride has never been easier. Just follow these simple steps.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={4} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Box component="img" src="https://images.unsplash.com/photo-1551650975-87deedd944c3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80" alt="Mobile app" sx={{ width: '100%', borderRadius: 4, boxShadow: 4 }} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Box>
+              <Box display="flex" alignItems="flex-start" mb={4}>
+                <Box 
+                  sx={{ 
+                    minWidth: 40, 
+                    height: 40, 
+                    borderRadius: '50%', 
+                    backgroundColor: theme.palette.primary.main, 
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 'bold',
+                    mr: 2
+                  }}
+                >
+                  1
+                </Box>
+                <Box>
+                  <Typography variant="h5" gutterBottom fontWeight="bold">
+                    Enter Your Location
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Use the app to enter your pickup location and destination. You can either type the address or select it directly on the map.
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box display="flex" alignItems="flex-start" mb={4}>
+                <Box 
+                  sx={{ 
+                    minWidth: 40, 
+                    height: 40, 
+                    borderRadius: '50%', 
+                    backgroundColor: theme.palette.primary.main, 
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 'bold',
+                    mr: 2
+                  }}
+                >
+                  2
+                </Box>
+                <Box>
+                  <Typography variant="h5" gutterBottom fontWeight="bold">
+                    Choose Your Ride
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Select from different ride options based on your preference and budget. See the estimated price and arrival time before confirming.
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box display="flex" alignItems="flex-start">
+                <Box 
+                  sx={{ 
+                    minWidth: 40, 
+                    height: 40, 
+                    borderRadius: '50%', 
+                    backgroundColor: theme.palette.primary.main, 
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 'bold',
+                    mr: 2
+                  }}
+                >
+                  3
+                </Box>
+                <Box>
+                  <Typography variant="h5" gutterBottom fontWeight="bold">
+                    Track & Enjoy Your Ride
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Watch your driver arrive in real-time on the map. After the ride, rate your experience and provide feedback.
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Testimonials Section */}
+      <Box sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05), py: 10 }}>
+        <Container maxWidth="lg">
+          <Box textAlign="center" mb={8}>
+            <Typography variant="h3" component="h2" fontWeight="bold" gutterBottom>
+              What Our Customers Say
+            </Typography>
+            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+              Don't just take our word for it. Here's what our customers have to say about their experiences.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={4}>
+            {testimonials.map((testimonial, index) => (
+              <Grid item xs={12} md={4} key={index}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 4, 
+                    height: '100%', 
+                    borderRadius: 4,
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                >
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <Avatar 
+                      sx={{ 
+                        bgcolor: theme.palette.primary.main, 
+                        width: 56, 
+                        height: 56,
+                        mr: 2 
+                      }}
+                    >
+                      {testimonial.avatar}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h6" fontWeight="bold">
+                        {testimonial.name}
+                      </Typography>
+                      <Box display="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} sx={{ 
+                            color: i < testimonial.rating ? '#FFD700' : 'grey.300',
+                            fontSize: '1rem'
+                          }} />
+                        ))}
+                      </Box>
+                    </Box>
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="body1" sx={{ flexGrow: 1 }}>
+                    "{testimonial.text}"
+                  </Typography>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* CTA Section */}
+      <Box
+        sx={{
+          py: 10,
+          background: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('https://images.unsplash.com/photo-1574725466569-eea7d27b0e76?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          color: 'white',
+          textAlign: 'center'
+        }}
+      >
+        <Container maxWidth="md">
+          <Typography variant="h3" component="h2" fontWeight="bold" gutterBottom>
+            Ready to Get Started?
+          </Typography>
+          <Typography variant="h6" sx={{ mb: 4, maxWidth: 700, mx: 'auto', fontWeight: 300 }}>
+            Join thousands of satisfied customers who rely on our service for their daily commute and travel needs.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
+            <Button
+              variant="contained"
+              size="large"
+              color="primary"
+              onClick={() => navigate('/book-ride')}
+              sx={{ 
+                px: 4, 
+                py: 1.5,
+                fontSize: '1.1rem',
+                borderRadius: 2
+              }}
+            >
+              Book Your First Ride
+            </Button>
+            <Button
+              variant="outlined"
+              size="large"
+              onClick={() => navigate('/ride-history')}
+              sx={{ 
+                px: 4, 
+                py: 1.5,
+                fontSize: '1.1rem',
+                borderRadius: 2,
+                color: 'white',
+                borderColor: 'white',
+                '&:hover': {
+                  borderColor: 'white',
+                  backgroundColor: 'rgba(255,255,255,0.1)'
+                }
+              }}
+            >
+              View Ride History
+            </Button>
+          </Box>
+        </Container>
+      </Box>
+
+      {/* Safety Section */}
+      <Container maxWidth="lg" sx={{ py: 10 }}>
+        <Grid container spacing={6} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Typography variant="h3" component="h2" fontWeight="bold" gutterBottom>
+              Your Safety is Our Priority
+            </Typography>
+            <Typography variant="body1" paragraph color="text.secondary" sx={{ mb: 4 }}>
+              We've implemented comprehensive safety measures to ensure you have peace of mind with every ride. From driver background checks to real-time trip monitoring, we've got you covered.
+            </Typography>
+            
+            <Box display="flex" alignItems="flex-start" mb={3}>
+              <Security color="primary" sx={{ fontSize: 32, mr: 2, mt: 0.5 }} />
+              <Box>
+                <Typography variant="h6" fontWeight="bold">
+                  Driver Verification
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  All drivers undergo thorough background checks and vehicle inspections.
+                </Typography>
+              </Box>
+            </Box>
+            
+            <Box display="flex" alignItems="flex-start" mb={3}>
+              <SupervisorAccount color="primary" sx={{ fontSize: 32, mr: 2, mt: 0.5 }} />
+              <Box>
+                <Typography variant="h6" fontWeight="bold">
+                  Trip Sharing
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  Share your trip details and real-time location with trusted contacts.
+                </Typography>
+              </Box>
+            </Box>
+            
+            <Box display="flex" alignItems="flex-start">
+              <Speed color="primary" sx={{ fontSize: 32, mr: 2, mt: 0.5 }} />
+              <Box>
+                <Typography variant="h6" fontWeight="bold">
+                  24/7 Support
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  Our support team is available around the clock to assist with any issues.
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Box component="img" src="https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80" alt="Safety" sx={{ width: '100%', borderRadius: 4, boxShadow: 4 }} />
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
   );
 };
 
